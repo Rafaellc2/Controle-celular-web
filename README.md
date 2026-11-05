@@ -65,6 +65,8 @@ Opções:
 | Opção        | Efeito                                                      |
 |--------------|-------------------------------------------------------------|
 | `--port N`   | Muda a porta (padrão `8080`, ou `CONTROLE_WEB_PORT`)        |
+| `--https-port N` | Porta HTTPS para o giroscópio (padrão `8443`; `0` desliga) |
+| `--name NOME` | Link fixo `http://NOME.local` (padrão `controle`)          |
 | `--max-players N` | Quantidade inicial de controles (padrão 4, máx. 8; muda no painel) |
 | `--dry-run`  | Não cria o controle virtual; só mostra as entradas no log   |
 | `--verbose`  | Loga também os movimentos do analógico                      |
@@ -73,6 +75,20 @@ Opções:
 Na primeira execução o Windows pergunta se o Python pode acessar a rede:
 permita em **Redes privadas**. Confirme também que sua conexão Wi-Fi está como
 perfil **Privado** (Configurações → Rede e Internet → Wi-Fi → propriedades).
+No Linux com ufw, libere as duas portas (o painel mostra o comando):
+`sudo ufw allow from 192.168.0.0/24 to any port 8080,8443 proto tcp`.
+
+### Links
+O painel mostra três links (com QR Code):
+
+| Link | Quando usar |
+|------|-------------|
+| **Link fixo** `http://controle.local:8080` | Padrão. Não muda quando o IP do PC muda, então o layout salvo no celular continua. iPhone e Android 12+. |
+| **Pelo IP** `http://192.168.x.x:8080` | Celular que não abre o `.local`. |
+| **Com giroscópio** `https://192.168.x.x:8443` | Para usar o giroscópio (o navegador só libera o sensor em HTTPS). Na primeira vez aparece o aviso de certificado: **Avançado → Continuar**. |
+
+O certificado HTTPS é gerado sozinho em `~/.controle-web/`. Cada link guarda
+seus próprios perfis no celular (o navegador separa por endereço).
 
 ## 3. Conectar o celular
 
@@ -94,9 +110,10 @@ abre o painel direto.
   religar.
 - **Link e QR Code** para passar aos amigos, com botão de copiar.
 - **Controles:** um cartão por JOYSTICK-N com o aparelho, IP, ping, botões
-  apertados e analógico ao vivo (bom para testar). Dá para dar nome ao
-  jogador, **mover** para outro número (troca com quem estiver lá) ou
-  **remover**.
+  apertados, os dois analógicos e a vibração do jogo ao vivo (bom para
+  testar). Dá para dar nome ao jogador, **achar** (o celular dele pisca na
+  cor do JOYSTICK e vibra), **mover** para outro número (troca com quem
+  estiver lá) ou **remover**.
 - **Jogadores:** quantos controles existem (1 a 8).
 - **Avisos:** firewall bloqueando a porta, ou controle virtual em modo de
   teste (sem driver/permissão), com o comando para resolver.
@@ -139,10 +156,27 @@ O log do servidor fica em `$XDG_RUNTIME_DIR/controle-web.log`.
 | L2 / R2            | LT / RT (gatilho total)     |
 | SELECT / START     | Back / Start                |
 | D-pad              | D-pad (com diagonais)       |
-| Analógico          | Analógico esquerdo          |
+| Analógico esquerdo / direito | Analógicos esquerdo / direito |
+| L3 / R3 (ocultos no padrão) | Clique dos analógicos |
 
 Multi-touch: dá para segurar R1 (correr) e apertar ✕/○/□ ao mesmo tempo, e
 deslizar o dedo de um botão de ação para outro sem levantar.
+
+### Ajustes no celular (⚙)
+
+- **Perfis do HUD:** um layout e ajustes por jogo (ex.: "Bomba Patch",
+  "Corrida"). **+ Novo** copia o perfil atual. Tudo fica salvo no celular.
+- **Editar HUD:** arraste para mover, pinça com dois dedos (ou − / +) para o
+  tamanho, **Ocultar/Mostrar** botões (L3/R3 começam ocultos).
+- **Analógico flutuante:** o analógico esquerdo aparece onde o dedo encostar
+  no lado esquerdo da tela.
+- **Vibração ao apertar:** desligada, fraca, média ou forte, com botão de teste.
+- **Vibração do jogo:** o celular vibra quando o jogo manda vibrar o
+  controle (Linux e Windows).
+- **Giroscópio** (precisa do link HTTPS): **Volante** controla o analógico
+  esquerdo girando o celular; **Inclinar** usa também frente/trás.
+  **Centralizar** define a posição neutra; **Inverter** troca o sentido.
+  Encostar no analógico tem prioridade sobre o giroscópio.
 
 ## 5. Configurar o emulador
 
@@ -236,6 +270,10 @@ Conexão: `/ws?cid=<id do celular>&dev=<aparelho>`. O servidor responde
 `{"t":"slot","slot":N}` (movido) ou `{"t":"name","name":"..."}`.
 Códigos de fechamento: `4000` aberto em outra aba, `4001` acesso desligado,
 `4002` sala cheia, `4003` removido pelo painel.
+
+Do servidor para o celular também vêm `{"t":"rumble","v":0.75,"ms":500}`
+(vibração do jogo; `ms` nulo = até chegar `v:0`) e `{"t":"find","slot":N}`
+(achar controle). O `hello` traz `"https"` com o link seguro, se houver.
 
 Otimizações: botões são enviados só quando mudam; o analógico é agrupado em no
 máximo um pacote por quadro (`requestAnimationFrame`) com o valor mais recente,

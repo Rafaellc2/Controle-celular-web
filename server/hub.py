@@ -36,6 +36,8 @@ class Player:
         self.last_input = 0.0
         self.held = set()
         self.stick = (0.0, 0.0)
+        self.rstick = (0.0, 0.0)
+        self.rumble = 0.0
 
     @property
     def online(self):
@@ -54,6 +56,8 @@ class Player:
             "since": self.connected_at,
             "held": sorted(self.held),
             "stick": self.stick,
+            "rstick": self.rstick,
+            "rumble": self.rumble,
             "reserve_left": reserve_left,
         }
 
@@ -79,23 +83,52 @@ class Hub:
             if n in self.pads:
                 continue
             try:
-                self.pads[n] = create_gamepad(n, self.dry_run)
+                self.pads[n] = self._new_pad(n, self.dry_run)
             except Exception as exc:
                 log.error("Não foi possível criar o controle virtual: %s", exc)
                 log.error("Caindo para dry-run (veja o painel / README.md).")
                 self.backend_error = str(exc)
                 self.dry_run = True
                 self.backend = "dry-run"
-                self.pads[n] = create_gamepad(n, True)
+                self.pads[n] = self._new_pad(n, True)
             self.changed()
         return self.pads[slot]
+
+    def _new_pad(self, slot, dry_run):
+        pad = create_gamepad(slot, dry_run)
+        try:
+            pad.attach_rumble(asyncio.get_running_loop(), lambda v, ms: self._rumble(slot, v, ms))
+        except Exception as exc:  # vibração é extra: o controle funciona sem ela
+            log.warning("JOYSTICK-%d sem vibração do jogo: %s", slot, exc)
+        return pad
+
+    def _rumble(self, slot, strength, ms):
+        """Jogo pediu vibração no JOYSTICK-N: repassa para o celular desse slot."""
+        player = self.players.get(slot)
+        if player is None:
+            return
+        strength = round(max(0.0, min(1.0, strength)), 2)
+        if ms is None and strength == player.rumble:
+            return  # ViGEmBus repete o mesmo estado várias vezes
+        player.rumble = strength
+        self.changed()
+        if player.online:
+            asyncio.create_task(self._send(player, {"t": "rumble", "v": strength, "ms": ms}))
+
+    async def _send(self, player, msg):
+        ws = player.ws
+        if ws is not None and not ws.closed:
+            try:
+                await ws.send_json(msg)
+            except ConnectionError:
+                pass
 
     def retry_backend(self):
         """Tenta de novo o backend real (ex.: depois de liberar /dev/uinput)."""
         if self.forced_dry_run or not self.backend_error:
             return
         try:
-            first = create_gamepad(1, False)
+            first = self._new_pad(1, False)
         except Exception as exc:
             self.backend_error = str(exc)
             self.changed()
@@ -162,14 +195,19 @@ class Hub:
                 player.held.add(str(msg["b"]))
             else:
                 player.held.discard(str(msg["b"]))
-        elif "a" in msg and msg.get("a") == "L":
+        elif "a" in msg and msg.get("a") in ("L", "R"):
             try:
-                player.stick = (round(float(msg.get("x", 0)), 2), round(float(msg.get("y", 0)), 2))
+                value = (round(float(msg.get("x", 0)), 2), round(float(msg.get("y", 0)), 2))
             except (TypeError, ValueError):
                 return
+            if msg["a"] == "L":
+                player.stick = value
+            else:
+                player.rstick = value
         elif "r" in msg:
             player.held.clear()
             player.stick = (0.0, 0.0)
+            player.rstick = (0.0, 0.0)
         player.last_input = time.monotonic()
         self.pads[player.slot].apply(msg)
         self.changed()
@@ -177,6 +215,8 @@ class Hub:
     def _release(self, player):
         player.held.clear()
         player.stick = (0.0, 0.0)
+        player.rstick = (0.0, 0.0)
+        player.rumble = 0.0
         if player.slot in self.pads:
             self.pads[player.slot].reset()
 
@@ -229,6 +269,12 @@ class Hub:
                 await p.ws.send_json({"t": "slot", "slot": p.slot})
         log.info("JOYSTICK-%d movido para JOYSTICK-%d", slot, to)
         self.changed()
+
+    async def find(self, slot):
+        """Faz o celular do JOYSTICK-N vibrar e piscar, para o jogador se achar."""
+        player = self.players.get(slot)
+        if player and player.online:
+            await self._send(player, {"t": "find", "slot": slot})
 
     async def rename(self, slot, name):
         player = self.players.get(slot)

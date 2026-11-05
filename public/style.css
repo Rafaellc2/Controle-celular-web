@@ -98,6 +98,11 @@ html, body {
   font-size: 8vmin;
   font-weight: 400;
 }
+.btn.round.thumb {
+  font-size: 5vmin;
+  font-weight: 700;
+  color: var(--muted);
+}
 .triangle { color: var(--triangle); }
 .square   { color: var(--square); }
 .circle   { color: var(--circle); }
@@ -161,6 +166,8 @@ html, body {
   will-change: transform;
 }
 .stick.active .knob { background: #5d6580; }
+/* Analógico flutuante: aparece onde o dedo encostou, mesmo se oculto no layout */
+.stick.floating { display: block !important; opacity: 0.85; transition: none; }
 
 /* ---------- Topo: status + menu ---------- */
 .topbar {
@@ -291,13 +298,15 @@ body.editing .item.selected {
 
 .sheet-backdrop { background: rgba(10, 11, 15, 0.75); }
 .sheet {
-  width: min(80vw, 110vmin);
-  max-height: 92vh;
-  overflow: hidden;
+  width: min(94vw, 190vmin);
+  max-height: 94vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   display: flex;
   flex-direction: column;
   gap: 2vmin;
-  padding: 3.5vmin;
+  padding: 3vmin 3.5vmin;
   border-radius: 3vmin;
   background: var(--panel);
   border: 1px solid var(--btn-edge);
@@ -305,6 +314,66 @@ body.editing .item.selected {
   text-align: left;
 }
 .sheet h2 { font-size: 5vmin; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; }
+.sheet-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 4vmin; }
+.sheet-col { display: flex; flex-direction: column; gap: 1.8vmin; min-width: 0; }
+.row { display: flex; gap: 1.5vmin; flex-wrap: wrap; align-items: center; }
+.chips { display: flex; gap: 1.5vmin; flex-wrap: wrap; }
+.chip {
+  padding: 1.4vmin 2.6vmin;
+  border-radius: 99px;
+  background: var(--btn);
+  border: 1px solid var(--btn-edge);
+  font-weight: 700;
+  font-size: 3.2vmin;
+}
+.chip.on { background: var(--accent); color: #0b0c10; border-color: var(--accent); }
+.mini-btn {
+  padding: 1.4vmin 2.6vmin;
+  border-radius: 1.5vmin;
+  background: var(--btn);
+  border: 1px solid var(--btn-edge);
+  font-weight: 700;
+  font-size: 3.2vmin;
+  white-space: nowrap;
+}
+.mini-btn.danger { color: var(--bad); }
+.mini-btn.confirm { background: var(--bad); color: #12090b; }
+.mini-btn.disabled { opacity: 0.35; }
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2vmin;
+  padding: 1.6vmin 2.4vmin;
+  border-radius: 2vmin;
+  background: var(--btn);
+  border: 1px solid var(--btn-edge);
+  font-weight: 700;
+}
+.toggle small { display: block; font-weight: 400; color: var(--muted); font-size: 2.8vmin; }
+.toggle.compact { padding: 1.2vmin 2.4vmin; font-size: 3.2vmin; }
+.tg {
+  flex: none;
+  width: 9vmin;
+  height: 5vmin;
+  border-radius: 99px;
+  background: #3a3f4d;
+  position: relative;
+}
+.tg::after {
+  content: "";
+  position: absolute;
+  top: 0.6vmin;
+  left: 0.6vmin;
+  width: 3.8vmin;
+  height: 3.8vmin;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 120ms;
+}
+.tg.on { background: var(--ok); }
+.tg.on::after { transform: translateX(4vmin); }
 .sheet-btn {
   padding: 2.2vmin 3vmin;
   border-radius: 2vmin;
@@ -328,6 +397,16 @@ body.editing .item.selected {
   font-size: 3.2vmin;
 }
 .seg.on { background: var(--accent); color: #0b0c10; border-color: var(--accent); }
+
+/* ---------- Achar controle ---------- */
+.find {
+  background: var(--find-color, var(--accent));
+  color: #0b0c10;
+  font-weight: 800;
+  animation: blink 0.4s steps(2, jump-none) 6;
+}
+.find-label { font-size: 14vmin; letter-spacing: 0.04em; }
+@keyframes blink { 50% { background: var(--bg); color: var(--find-color, var(--accent)); } }
 
 /* ---------- Avisos ---------- */
 .rotate { display: none; }

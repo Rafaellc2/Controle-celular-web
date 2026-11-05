@@ -11,10 +11,11 @@
   const RECONNECT_MIN = 250;
   const RECONNECT_MAX = 2000;
   const RETRY_BLOCKED = 3000;      // acesso desligado / sala cheia: tenta de novo neste intervalo
+  const TAP_SLOP = 12;             // px que o dedo pode andar e ainda contar como toque num botão do menu
   // Cor de cada JOYSTICK-N (mesma ordem do painel)
   const SLOT_COLORS = ["#7fa8ff", "#ff6b6b", "#4fd1a5", "#e58cff", "#ffb547", "#5ad7e6", "#ff9a5a", "#b49cff"];
 
-  // Layout padrão do HUD: centro do item em % da tela (x, y) e escala (s)
+  // Layout padrão do HUD: centro do item em % da tela (x, y), escala (s) e se começa oculto
   const DEFAULT_LAYOUT = {
     LT: { x: 10, y: 12, s: 1 },
     LB: { x: 27, y: 12, s: 1 },
@@ -22,24 +23,36 @@
     RT: { x: 90, y: 12, s: 1 },
     DPAD: { x: 17, y: 42, s: 1 },
     STICK: { x: 30, y: 74, s: 1 },
-    BACK: { x: 45, y: 86, s: 1 },
-    START: { x: 55, y: 86, s: 1 },
+    RSTICK: { x: 64, y: 80, s: 0.75 },
+    BACK: { x: 42, y: 30, s: 1 },
+    START: { x: 58, y: 30, s: 1 },
+    L3: { x: 44, y: 60, s: 0.6, hidden: true },
+    R3: { x: 56, y: 60, s: 0.6, hidden: true },
     Y: { x: 83, y: 32, s: 1 },
     X: { x: 72, y: 52, s: 1 },
     B: { x: 94, y: 52, s: 1 },
     A: { x: 83, y: 72, s: 1 },
   };
   const ITEM_NAMES = {
-    LT: "L2", LB: "L1", RB: "R1", RT: "R2", DPAD: "Direcional", STICK: "Analógico",
-    BACK: "SELECT", START: "START", Y: "△ Triângulo", X: "□ Quadrado", B: "○ Círculo", A: "✕ Xis",
+    LT: "L2", LB: "L1", RB: "R1", RT: "R2", DPAD: "Direcional",
+    STICK: "Analógico esquerdo", RSTICK: "Analógico direito",
+    BACK: "SELECT", START: "START", L3: "L3", R3: "R3",
+    Y: "△ Triângulo", X: "□ Quadrado", B: "○ Círculo", A: "✕ Xis",
   };
-  const SCALE_MIN = 0.5;
+  const SCALE_MIN = 0.4;
   const SCALE_MAX = 2.2;
-  const LAYOUT_KEY = "controle-hud-v1";
+  const PROFILES_KEY = "controle-perfis-v1";
+  const OLD_LAYOUT_KEY = "controle-hud-v1"; // versão antiga: um layout só
 
   // Vibração por nível: desligada, fraca, média, forte (ms)
   const VIBRA_MS = [0, 15, 30, 55];
   const VIBRA_KEY = "controle-vibra";
+  const GAME_VIBRA_KEY = "controle-vibra-jogo";
+
+  // Giroscópio: ângulo (graus) para o analógico ir até o fim
+  const GYRO_STEER_MAX = 28;
+  const GYRO_TILT_MAX = 22;
+  const GYRO_DEADZONE = 2;
 
   // ---------- Armazenamento local (pode falhar em aba anônima) ----------
   function load(key) {
@@ -57,9 +70,8 @@
   const noticeEl = $("#notice");
   const menuEl = $("#menu");
   const editbarEl = $("#editbar");
+  const findEl = $("#find");
   const dpadEl = $("#dpad");
-  const stickEl = $("#stick");
-  const knobEl = $("#knob");
   const hapticEl = $("#haptic");
 
   const items = {};
@@ -95,26 +107,60 @@
   const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-  // ---------- Layout do HUD ----------
-  function copyLayout(layout) {
-    return JSON.parse(JSON.stringify(layout));
+  function clamp(v, min, max) {
+    return Math.min(max, Math.max(min, v));
   }
 
-  function loadLayout() {
-    const layout = copyLayout(DEFAULT_LAYOUT);
-    let saved = null;
-    try { saved = JSON.parse(load(LAYOUT_KEY) || "null"); } catch { saved = null; }
-    if (saved && typeof saved === "object") {
-      for (const id of Object.keys(layout)) {
-        const it = saved[id];
-        if (!it) continue;
-        if (Number.isFinite(it.x)) layout[id].x = clamp(it.x, 0, 100);
-        if (Number.isFinite(it.y)) layout[id].y = clamp(it.y, 0, 100);
-        if (Number.isFinite(it.s)) layout[id].s = clamp(it.s, SCALE_MIN, SCALE_MAX);
-        layout[id].hidden = Boolean(it.hidden);
-      }
+  function copy(obj) {
+    return JSON.parse(JSON.stringify(obj));
+  }
+
+  // ---------- Perfis (layout + ajustes por jogo) ----------
+  // { active: "Padrão", list: { "Padrão": { layout, floating, gyro, gyroInvert } } }
+  function normalizeLayout(saved) {
+    const layout = copy(DEFAULT_LAYOUT);
+    if (!saved || typeof saved !== "object") return layout;
+    for (const id of Object.keys(layout)) {
+      const it = saved[id];
+      if (!it) continue;
+      if (Number.isFinite(it.x)) layout[id].x = clamp(it.x, 0, 100);
+      if (Number.isFinite(it.y)) layout[id].y = clamp(it.y, 0, 100);
+      if (Number.isFinite(it.s)) layout[id].s = clamp(it.s, SCALE_MIN, SCALE_MAX);
+      if ("hidden" in it) layout[id].hidden = Boolean(it.hidden);
     }
     return layout;
+  }
+
+  function newProfile(layout) {
+    return { layout: normalizeLayout(layout), floating: false, gyro: "off", gyroInvert: false };
+  }
+
+  function loadProfiles() {
+    let data = null;
+    try { data = JSON.parse(load(PROFILES_KEY) || "null"); } catch { data = null; }
+    if (!data || typeof data.list !== "object" || !Object.keys(data.list).length) {
+      // Primeira vez (ou vindo da versão com um layout só)
+      let old = null;
+      try { old = JSON.parse(load(OLD_LAYOUT_KEY) || "null"); } catch { old = null; }
+      data = { active: "Padrão", list: { "Padrão": newProfile(old) } };
+    }
+    for (const [name, p] of Object.entries(data.list)) {
+      data.list[name] = {
+        layout: normalizeLayout(p.layout),
+        floating: Boolean(p.floating),
+        gyro: ["off", "steer", "tilt"].includes(p.gyro) ? p.gyro : "off",
+        gyroInvert: Boolean(p.gyroInvert),
+      };
+    }
+    if (!data.list[data.active]) data.active = Object.keys(data.list)[0];
+    return data;
+  }
+
+  const profiles = loadProfiles();
+  const prof = () => profiles.list[profiles.active];
+
+  function saveProfiles() {
+    save(PROFILES_KEY, JSON.stringify(profiles));
   }
 
   function applyItem(id, it) {
@@ -129,17 +175,14 @@
     for (const id of Object.keys(items)) applyItem(id, layout[id]);
   }
 
-  function clamp(v, min, max) {
-    return Math.min(max, Math.max(min, v));
-  }
-
-  let layout = loadLayout();
-  applyLayout(layout);
+  applyLayout(prof().layout);
 
   // ---------- Vibração ----------
   let vibraLevel = Number(load(VIBRA_KEY) ?? 2);
   if (!(vibraLevel in VIBRA_MS)) vibraLevel = 2;
+  let gameVibra = load(GAME_VIBRA_KEY) !== "0";
   const canVibrate = typeof navigator.vibrate === "function";
+  let rumbleTimer = null;
 
   function haptic() {
     if (!vibraLevel) return;
@@ -148,6 +191,32 @@
     } else if (IS_IOS) {
       hapticEl.click(); // Safari 18+: alternar um <input switch> dá um toque háptico
     }
+  }
+
+  // Vibração pedida pelo jogo. O motor do celular só liga/desliga, então a
+  // força vira um padrão liga/desliga (quanto mais forte, menos pausas).
+  function playRumble(v, ms) {
+    clearTimeout(rumbleTimer);
+    if (!gameVibra) return;
+    if (!canVibrate) {
+      if (IS_IOS && v > 0.05) hapticEl.click();
+      return;
+    }
+    if (!(v > 0.05)) {
+      navigator.vibrate(0);
+      return;
+    }
+    const total = ms || 1000;
+    const on = 25;
+    const off = Math.round((on * (1 - v)) / Math.max(v, 0.15));
+    let pattern = [total];
+    if (off >= 5) {
+      pattern = [];
+      for (let t = 0; t < total; t += on + off) pattern.push(on, off);
+    }
+    navigator.vibrate(pattern);
+    // Sem duração (ViGEmBus manda só o estado dos motores): renova até o jogo mandar parar.
+    if (!ms) rumbleTimer = setTimeout(() => playRumble(v, null), 900);
   }
 
   // Diagnóstico: diz se o bloqueio é do navegador ou do celular
@@ -168,16 +237,6 @@
       : "O navegador recusou a vibração. Toque em qualquer lugar da tela uma vez e teste de novo.";
   }
 
-  function renderVibra() {
-    document.querySelectorAll("#vibra .seg").forEach((el) => {
-      el.classList.toggle("on", el.dataset.action === `vibra:${vibraLevel}`);
-    });
-    let note = "";
-    if (!canVibrate && IS_IOS) note = "No iPhone a vibração tem força fixa e precisa do iOS 18 ou mais novo.";
-    else if (!canVibrate) note = "Este navegador não permite vibração.";
-    $("#vibra-note").textContent = note;
-  }
-
   // ---------- WebSocket ----------
   let ws = null;
   let reconnectDelay = RECONNECT_MIN;
@@ -186,6 +245,8 @@
   let lastPong = 0;
   let lastRtt = null;
   let playerName = "";
+  let currentSlot = null;
+  let httpsUrl = null;
   let stopped = false; // true quando removido ou aberto em outra aba: só volta com toque
 
   function isOpen() {
@@ -201,9 +262,14 @@
     statusText.textContent = text;
   }
 
+  function slotColor(slot) {
+    return SLOT_COLORS[(slot - 1) % SLOT_COLORS.length];
+  }
+
   function setSlot(slot) {
+    currentSlot = slot;
     slotEl.textContent = slot ? `J${slot}` : "J?";
-    statusEl.style.setProperty("--slot-color", slot ? SLOT_COLORS[(slot - 1) % SLOT_COLORS.length] : "");
+    statusEl.style.setProperty("--slot-color", slot ? slotColor(slot) : "");
     document.title = slot ? `JOYSTICK-${slot}` : "Web Controller";
   }
 
@@ -215,6 +281,22 @@
 
   function hideNotice() {
     noticeEl.classList.add("hidden");
+  }
+
+  // Painel do PC pediu "achar controle": pisca a cor do slot e vibra
+  let findTimer = null;
+  function showFind(slot) {
+    findEl.style.setProperty("--find-color", slotColor(slot));
+    $("#find-label").textContent = `JOYSTICK-${slot}`;
+    findEl.classList.remove("hidden");
+    // Reinicia a animação de piscar
+    findEl.style.animation = "none";
+    void findEl.offsetWidth;
+    findEl.style.animation = "";
+    if (canVibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+    else if (IS_IOS) hapticEl.click();
+    clearTimeout(findTimer);
+    findTimer = setTimeout(() => findEl.classList.add("hidden"), 2600);
   }
 
   function connect() {
@@ -245,6 +327,7 @@
         // Aceito pelo servidor: zera o controle no PC e reenvia o que está pressionado.
         reconnectDelay = RECONNECT_MIN;
         playerName = data.name || "";
+        httpsUrl = data.https || null;
         setSlot(data.slot);
         hideNotice();
         setStatus("on", playerName || "Conectado");
@@ -254,6 +337,10 @@
         haptic();
       } else if (data.t === "name") {
         playerName = data.name || "";
+      } else if (data.t === "rumble") {
+        playRumble(Number(data.v) || 0, data.ms || null);
+      } else if (data.t === "find") {
+        showFind(data.slot || currentSlot || 1);
       }
     };
 
@@ -261,6 +348,7 @@
       if (ws !== sock) return;
       clearInterval(pingTimer);
       ws = null;
+      playRumble(0);
       setSlot(null);
       setStatus("off", "Desconectado");
 
@@ -301,20 +389,18 @@
   function sendSnapshot() {
     send({ r: 1 });
     for (const name of sent) send({ b: name, s: 1 });
-    if (stick.x !== 0 || stick.y !== 0) {
-      send({ a: "L", x: stick.x, y: stick.y });
+    for (const st of Object.values(sticks)) {
+      if (st.x !== 0 || st.y !== 0) send({ a: st.id, x: st.x, y: st.y });
+      st.sentX = st.x;
+      st.sentY = st.y;
     }
-    stick.sentX = stick.x;
-    stick.sentY = stick.y;
   }
 
   // ---------- Estado de entrada ----------
-  // touchId -> { kind: "btn", btn } | { kind: "dpad", dirs: [] } | { kind: "stick" } | { kind: "ui" }
-  // Todos guardam `action`: o elemento [data-action] onde o toque começou.
+  // touchId -> { kind: "btn", btn } | { kind: "dpad", dirs: [] } | { kind: "stick", id }
+  //          | { kind: "ui", action, x, y } | { kind: "edit" }
   const touches = new Map();
   const sent = new Set(); // botões que o PC acredita estarem pressionados
-  const stick = { touchId: null, cx: 0, cy: 0, radius: 1, x: 0, y: 0, sentX: 0, sentY: 0 };
-  let stickFrame = 0;
 
   // Recalcula o conjunto de botões pressionados e envia só as diferenças.
   function syncButtons() {
@@ -369,78 +455,199 @@
     ][sector];
   }
 
-  // ---------- Analógico ----------
-  function stickStart(touch) {
-    const r = stickEl.getBoundingClientRect();
-    stick.touchId = touch.identifier;
-    stick.cx = r.left + r.width / 2;
-    stick.cy = r.top + r.height / 2;
-    stick.radius = r.width / 2;
-    stickEl.classList.add("active");
-    stickMove(touch);
+  // ---------- Analógicos ----------
+  function makeStick(id, item) {
+    const el = items[item];
+    return {
+      id, item, el, knob: el.querySelector(".knob"),
+      touchId: null, cx: 0, cy: 0, radius: 1, floating: false,
+      x: 0, y: 0, sentX: 0, sentY: 0, frame: 0,
+    };
+  }
+  const sticks = { L: makeStick("L", "STICK"), R: makeStick("R", "RSTICK") };
+
+  function stickStart(st, touch, floatingAt) {
+    if (floatingAt) {
+      // Flutuante: o analógico vai para onde o dedo encostou
+      st.floating = true;
+      st.el.classList.add("floating");
+      st.el.style.setProperty("--x", (floatingAt.x / innerWidth) * 100);
+      st.el.style.setProperty("--y", (floatingAt.y / innerHeight) * 100);
+    }
+    const r = st.el.getBoundingClientRect();
+    st.touchId = touch.identifier;
+    st.cx = r.left + r.width / 2;
+    st.cy = r.top + r.height / 2;
+    st.radius = r.width / 2;
+    st.el.classList.add("active");
+    stickMove(st, touch);
   }
 
-  function stickMove(touch) {
-    let dx = (touch.clientX - stick.cx) / stick.radius;
-    let dy = (touch.clientY - stick.cy) / stick.radius;
+  function stickMove(st, touch) {
+    let dx = (touch.clientX - st.cx) / st.radius;
+    let dy = (touch.clientY - st.cy) / st.radius;
     const len = Math.hypot(dx, dy);
     if (len > 1) { dx /= len; dy /= len; }
 
     // Knob segue o dedo (limitado à borda). Usa o tamanho sem escala,
     // porque o knob já está dentro do item escalado.
-    const travel = (stickEl.offsetWidth / 2) * 0.6;
-    knobEl.style.transform = `translate(${dx * travel}px, ${dy * travel}px)`;
+    const travel = (st.el.offsetWidth / 2) * 0.6;
+    st.knob.style.transform = `translate(${dx * travel}px, ${dy * travel}px)`;
 
     // Deadzone radial com reescala, para não perder precisão perto do centro
     const mag = Math.min(len, 1);
     if (mag < STICK_DEADZONE) {
-      stick.x = 0;
-      stick.y = 0;
+      st.x = 0;
+      st.y = 0;
     } else {
       const scale = (mag - STICK_DEADZONE) / (1 - STICK_DEADZONE) / mag;
-      stick.x = round2(dx * scale);
-      stick.y = round2(dy * scale);
+      st.x = round2(dx * scale);
+      st.y = round2(dy * scale);
     }
-    scheduleStick();
+    scheduleStick(st);
   }
 
-  function stickEnd() {
-    stick.touchId = null;
-    stick.x = 0;
-    stick.y = 0;
-    stickEl.classList.remove("active");
-    knobEl.style.transform = "";
+  function stickEnd(st) {
+    st.touchId = null;
+    st.x = 0;
+    st.y = 0;
+    st.el.classList.remove("active");
+    st.knob.style.transform = "";
+    if (st.floating) {
+      st.floating = false;
+      st.el.classList.remove("floating");
+      applyItem(st.item, prof().layout[st.item]);
+    }
     // Soltar o analógico vai na hora, sem esperar o próximo frame
     // (rAF pode atrasar ou pausar, e o stick ficaria travado fora do centro).
-    if (stickFrame) cancelAnimationFrame(stickFrame);
-    flushStick(true);
+    if (st.frame) cancelAnimationFrame(st.frame);
+    if (st.id === "L" && gyroActive()) applyGyro(); // giroscópio volta a mandar no analógico
+    flushStick(st, true);
   }
 
   function round2(v) {
     return Math.round(v * 100) / 100;
   }
 
-  // Coalesce: no máximo um pacote de analógico por frame, sempre o valor mais recente.
-  function scheduleStick() {
-    if (!stickFrame) stickFrame = requestAnimationFrame(() => flushStick(false));
+  // Coalesce: no máximo um pacote por analógico por frame, sempre o valor mais recente.
+  function scheduleStick(st) {
+    if (!st.frame) st.frame = requestAnimationFrame(() => flushStick(st, false));
   }
 
-  function flushStick(force) {
-    stickFrame = 0;
+  function flushStick(st, force) {
+    st.frame = 0;
     if (!isOpen()) return; // o snapshot da reconexão envia o valor atual
-    const centered = stick.x === 0 && stick.y === 0;
+    const centered = st.x === 0 && st.y === 0;
     const changed =
-      Math.abs(stick.x - stick.sentX) > STICK_EPSILON ||
-      Math.abs(stick.y - stick.sentY) > STICK_EPSILON ||
-      (centered && (stick.sentX !== 0 || stick.sentY !== 0));
+      Math.abs(st.x - st.sentX) > STICK_EPSILON ||
+      Math.abs(st.y - st.sentY) > STICK_EPSILON ||
+      (centered && (st.sentX !== 0 || st.sentY !== 0));
     if (!changed) return;
     if (!force && ws.bufferedAmount > MAX_BUFFERED) {
-      scheduleStick(); // rede congestionada: tenta de novo no próximo frame com o valor mais novo
+      scheduleStick(st); // rede congestionada: tenta de novo no próximo frame com o valor mais novo
       return;
     }
-    send({ a: "L", x: stick.x, y: stick.y });
-    stick.sentX = stick.x;
-    stick.sentY = stick.y;
+    send({ a: st.id, x: st.x, y: st.y });
+    st.sentX = st.x;
+    st.sentY = st.y;
+  }
+
+  function stickByTouch(id) {
+    return Object.values(sticks).find((st) => st.touchId === id);
+  }
+
+  // ---------- Giroscópio ----------
+  // Usa a gravidade medida pelo acelerômetro: funciona em qualquer celular com sensor
+  // e não acumula erro. Precisa de HTTPS (contexto seguro) no Chrome e no Safari.
+  let gyroListening = false;
+  let gyroRaw = null;             // { roll, pitch } em graus
+  let gyroCenter = { roll: 0, pitch: 0 };
+  let gyroNeedsCenter = true;
+
+  function gyroActive() {
+    return prof().gyro !== "off" && gyroListening;
+  }
+
+  function onMotion(ev) {
+    const g = ev.accelerationIncludingGravity;
+    if (!g || g.x == null) return;
+    let gx = g.x, gy = g.y, gz = g.z;
+    // Android mede a reação à gravidade (aponta para cima); iOS mede a gravidade.
+    if (IS_IOS) { gx = -gx; gy = -gy; gz = -gz; }
+    const angle = (screen.orientation && screen.orientation.angle) ?? window.orientation ?? 90;
+    // Componentes nos eixos da tela em paisagem
+    let right, up;
+    if (angle === 90) { right = -gy; up = gx; }
+    else if (angle === 270 || angle === -90) { right = gy; up = -gx; }
+    else { right = gx; up = gy; }
+    const deg = 180 / Math.PI;
+    gyroRaw = {
+      roll: Math.atan2(-right, Math.hypot(up, gz)) * deg,   // girar como volante (+ = direita)
+      pitch: Math.atan2(up, gz) * deg,                       // inclinar para frente/trás
+    };
+    if (gyroNeedsCenter) {
+      gyroCenter = { ...gyroRaw };
+      gyroNeedsCenter = false;
+    }
+    applyGyro();
+  }
+
+  function gyroAxis(value, max) {
+    const v = Math.abs(value) < GYRO_DEADZONE ? 0 : value - Math.sign(value) * GYRO_DEADZONE;
+    return round2(clamp(v / (max - GYRO_DEADZONE), -1, 1));
+  }
+
+  function applyGyro() {
+    const st = sticks.L;
+    if (!gyroRaw || st.touchId !== null || editing) return; // dedo no analógico tem prioridade
+    const p = prof();
+    const sign = p.gyroInvert ? -1 : 1;
+    st.x = sign * gyroAxis(gyroRaw.roll - gyroCenter.roll, GYRO_STEER_MAX);
+    // Inclinar para frente (topo do celular se afastando) = analógico para cima
+    st.y = p.gyro === "tilt" ? sign * gyroAxis(gyroCenter.pitch - gyroRaw.pitch, GYRO_TILT_MAX) : 0;
+    scheduleStick(st);
+  }
+
+  let gyroAsking = false;
+
+  async function startGyro() {
+    if (gyroListening) return true;
+    if (!window.isSecureContext || gyroAsking) return false;
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      gyroAsking = true;
+      try {
+        if ((await DeviceMotionEvent.requestPermission()) !== "granted") return false;
+      } catch {
+        return false;
+      } finally {
+        gyroAsking = false;
+      }
+      if (prof().gyro === "off") return false; // desligado enquanto esperava a permissão
+    }
+    window.addEventListener("devicemotion", onMotion);
+    gyroListening = true;
+    gyroNeedsCenter = true;
+    return true;
+  }
+
+  function stopGyro() {
+    window.removeEventListener("devicemotion", onMotion);
+    gyroListening = false;
+    gyroRaw = null;
+    const st = sticks.L;
+    if (st.touchId === null) {
+      st.x = 0;
+      st.y = 0;
+      flushStick(st, true);
+    }
+  }
+
+  async function syncGyro() {
+    if (prof().gyro === "off") {
+      stopGyro();
+    } else if (!(await startGyro())) {
+      renderMenu();
+    }
   }
 
   // ---------- Modo de edição do HUD ----------
@@ -456,7 +663,7 @@
     send({ r: 1 });
     closeMenu();
     editing = true;
-    draft = copyLayout(layout);
+    draft = copy(prof().layout);
     select(null);
     document.body.classList.add("editing");
     editbarEl.classList.remove("hidden");
@@ -464,10 +671,10 @@
 
   function exitEdit(keep) {
     if (keep) {
-      layout = draft;
-      save(LAYOUT_KEY, JSON.stringify(layout));
+      prof().layout = draft;
+      saveProfiles();
     }
-    applyLayout(layout);
+    applyLayout(prof().layout);
     editing = false;
     draft = null;
     drag = null;
@@ -488,7 +695,7 @@
     const it = selected && draft ? draft[selected] : null;
     $("#edit-title").textContent = it
       ? `${ITEM_NAMES[selected]} · ${Math.round(it.s * 100)}%${it.hidden ? " · oculto" : ""}`
-      : "Arraste para mover · pinça com 2 dedos para redimensionar";
+      : `${profiles.active}: arraste para mover · pinça com 2 dedos para redimensionar`;
     $("#toggle-hide").textContent = it && it.hidden ? "Mostrar" : "Ocultar";
   }
 
@@ -554,14 +761,87 @@
   }
 
   // ---------- Menu ----------
+  let deleteArmed = false;
+
   function openMenu() {
     releaseAll();
-    renderVibra();
+    deleteArmed = false;
+    renderMenu();
     menuEl.classList.remove("hidden");
   }
 
   function closeMenu() {
     menuEl.classList.add("hidden");
+  }
+
+  function renderMenu() {
+    const p = prof();
+    // Perfis
+    const box = $("#profiles");
+    box.innerHTML = "";
+    Object.keys(profiles.list).forEach((name, i) => {
+      const chip = document.createElement("div");
+      chip.className = "chip" + (name === profiles.active ? " on" : "");
+      chip.dataset.action = `profile:${i}`;
+      chip.textContent = name;
+      box.appendChild(chip);
+    });
+    const del = $("#profile-delete");
+    del.classList.toggle("disabled", Object.keys(profiles.list).length < 2);
+    del.classList.toggle("confirm", deleteArmed);
+    del.textContent = deleteArmed ? "Toque de novo" : "Excluir";
+
+    $("#tg-floating").classList.toggle("on", p.floating);
+    $("#tg-game-vibra").classList.toggle("on", gameVibra);
+    $("#tg-gyro-invert").classList.toggle("on", p.gyroInvert);
+
+    document.querySelectorAll("#vibra .seg").forEach((el) => {
+      el.classList.toggle("on", el.dataset.action === `vibra:${vibraLevel}`);
+    });
+    document.querySelectorAll("#gyro .seg").forEach((el) => {
+      el.classList.toggle("on", el.dataset.action === `gyro:${p.gyro}`);
+    });
+
+    let vnote = "";
+    if (!canVibrate && IS_IOS) vnote = "No iPhone a vibração tem força fixa e precisa do iOS 18 ou mais novo.";
+    else if (!canVibrate) vnote = "Este navegador não permite vibração.";
+    $("#vibra-note").textContent = vnote;
+
+    // Giroscópio só funciona em HTTPS
+    let gnote = "";
+    const needHttps = p.gyro !== "off" && !window.isSecureContext;
+    if (needHttps) {
+      gnote = httpsUrl
+        ? "O giroscópio só funciona pelo link seguro (HTTPS). Seus perfis deste link não vão junto: crie de novo lá."
+        : "O giroscópio precisa do link seguro (HTTPS), que está desligado no servidor.";
+    } else if (p.gyro !== "off" && !gyroListening) {
+      gnote = "Sem acesso ao sensor de movimento. No iPhone, permita o acesso quando o Safari perguntar.";
+    } else if (p.gyro !== "off") {
+      gnote = "Segure o celular na posição de jogo e toque em Centralizar.";
+    }
+    $("#gyro-note").textContent = gnote;
+    $("#gyro-https").classList.toggle("hidden", !(needHttps && httpsUrl));
+  }
+
+  function uniqueName(base) {
+    let name = base;
+    for (let n = 2; profiles.list[name]; n++) name = `${base} ${n}`;
+    return name;
+  }
+
+  function switchProfile(name) {
+    if (!profiles.list[name] || name === profiles.active) return;
+    releaseAll();
+    profiles.active = name;
+    saveProfiles();
+    applyLayout(prof().layout);
+    syncGyro();
+    haptic();
+  }
+
+  function askName(title, value) {
+    const name = (window.prompt(title, value) || "").trim().slice(0, 20);
+    return name || null;
   }
 
   // ---------- Touch ----------
@@ -570,55 +850,88 @@
     return el ? el.closest("[data-action]") : null;
   }
 
+  function inScrollableMenu(target) {
+    return target instanceof Element && target.closest(".sheet") !== null;
+  }
+
   function onTouchStart(ev) {
-    ev.preventDefault();
+    // Dentro do menu deixa o navegador rolar a lista; o resto da tela é só do controle.
+    if (!inScrollableMenu(ev.target)) ev.preventDefault();
     for (const t of ev.changedTouches) {
       const el = document.elementFromPoint(t.clientX, t.clientY);
       const action = el ? el.closest("[data-action]") : null;
       if (action) {
-        // Botões de menu/edição: só disparam ao soltar no mesmo lugar
-        touches.set(t.identifier, { kind: "ui", action });
+        // Botões de menu/edição: só disparam ao soltar no mesmo lugar, sem arrastar
+        touches.set(t.identifier, { kind: "ui", action, x: t.clientX, y: t.clientY });
       } else if (editing) {
         editStart(t, el);
-      } else if (el && el.closest("#stick") && stick.touchId === null) {
-        touches.set(t.identifier, { kind: "stick" });
-        stickStart(t);
-      } else if (el && el.closest("#dpad")) {
-        touches.set(t.identifier, { kind: "dpad", dirs: dpadDirs(t.clientX, t.clientY) });
       } else {
-        touches.set(t.identifier, { kind: "btn", btn: buttonAt(t.clientX, t.clientY) });
+        startGameTouch(t, el);
       }
     }
     syncButtons();
   }
 
+  function startGameTouch(t, el) {
+    const stickEl = el && el.closest("[data-stick]");
+    const L = sticks.L;
+    if (stickEl) {
+      const st = sticks[stickEl.dataset.stick];
+      if (st.touchId === null) {
+        // Flutuante: encostar no analógico também recentraliza nele
+        const floatAt = st.id === "L" && prof().floating ? { x: t.clientX, y: t.clientY } : null;
+        touches.set(t.identifier, { kind: "stick", id: st.id });
+        stickStart(st, t, floatAt);
+        return;
+      }
+    }
+    if (el && el.closest("#dpad")) {
+      touches.set(t.identifier, { kind: "dpad", dirs: dpadDirs(t.clientX, t.clientY) });
+      return;
+    }
+    const btn = buttonAt(t.clientX, t.clientY);
+    if (!btn && prof().floating && L.touchId === null && t.clientX < innerWidth / 2) {
+      // Área vazia do lado esquerdo: analógico flutuante nasce aqui
+      touches.set(t.identifier, { kind: "stick", id: "L" });
+      stickStart(L, t, { x: t.clientX, y: t.clientY });
+      return;
+    }
+    touches.set(t.identifier, { kind: "btn", btn });
+  }
+
   function onTouchMove(ev) {
-    ev.preventDefault();
+    if (!inScrollableMenu(ev.target)) ev.preventDefault();
     for (const t of ev.changedTouches) {
       const state = touches.get(t.identifier);
       if (!state) continue;
       if (state.kind === "edit") editMove(t);
-      else if (state.kind === "stick") stickMove(t);
+      else if (state.kind === "stick") stickMove(sticks[state.id], t);
       else if (state.kind === "dpad") state.dirs = dpadDirs(t.clientX, t.clientY);
       else if (state.kind === "btn") state.btn = buttonAt(t.clientX, t.clientY); // permite deslizar entre botões
+      else if (state.kind === "ui" && Math.hypot(t.clientX - state.x, t.clientY - state.y) > TAP_SLOP) {
+        state.action = null; // virou rolagem/arraste: não dispara a ação
+      }
     }
     syncButtons();
   }
 
   function onTouchEnd(ev) {
-    ev.preventDefault();
+    if (!inScrollableMenu(ev.target)) ev.preventDefault();
     for (const t of ev.changedTouches) {
       const state = touches.get(t.identifier);
       touches.delete(t.identifier);
       if (!state) continue;
       if (state.kind === "edit") editEnd(t);
-      else if (state.kind === "stick") stickEnd();
-      else if (state.kind === "ui" && ev.type === "touchend" && actionAt(t.clientX, t.clientY) === state.action) {
-        // Ações que exigem gesto do usuário (tela cheia, vibração) disparam ao soltar
+      else if (state.kind === "stick") stickEnd(sticks[state.id]);
+      else if (state.kind === "ui" && state.action && ev.type === "touchend" &&
+               actionAt(t.clientX, t.clientY) === state.action) {
+        // Ações que exigem gesto do usuário (tela cheia, vibração, sensor) disparam ao soltar
         runAction(state.action.dataset.action);
       }
     }
     syncButtons();
+    // O sensor só pode ser liberado durante um toque: tenta no primeiro toque se o perfil usa giroscópio
+    if (ev.type === "touchend" && prof().gyro !== "off" && !gyroListening) startGyro();
   }
 
   function releaseAll() {
@@ -626,7 +939,9 @@
     touchPos.clear();
     drag = null;
     pinch = null;
-    if (stick.touchId !== null) stickEnd();
+    for (const st of Object.values(sticks)) {
+      if (st.touchId !== null) stickEnd(st);
+    }
     syncButtons();
   }
 
@@ -641,22 +956,16 @@
 
   // ---------- Ações ----------
   async function runAction(name) {
-    if (name.startsWith("vibra:")) {
-      vibraLevel = Number(name.slice(6));
-      save(VIBRA_KEY, String(vibraLevel));
-      renderVibra();
-      haptic(); // amostra da intensidade escolhida
-      return;
-    }
-    switch (name) {
+    const [cmd, arg] = name.split(":");
+    if (cmd !== "profile-delete") deleteArmed = false;
+    switch (cmd) {
       case "menu": openMenu(); break;
-      case "vibra-test": testVibra(); break;
       case "menu-close": closeMenu(); break;
       case "edit": enterEdit(); break;
       case "save": exitEdit(true); haptic(); break;
       case "cancel": exitEdit(false); break;
       case "reset":
-        draft = copyLayout(DEFAULT_LAYOUT);
+        draft = copy(DEFAULT_LAYOUT);
         applyLayout(draft);
         select(null);
         break;
@@ -674,6 +983,90 @@
         }
         break;
       case "bar-move": editbarEl.classList.toggle("bottom"); break;
+
+      case "vibra":
+        vibraLevel = Number(arg);
+        save(VIBRA_KEY, String(vibraLevel));
+        renderMenu();
+        haptic(); // amostra da intensidade escolhida
+        break;
+      case "vibra-test": testVibra(); break;
+      case "game-vibra":
+        gameVibra = !gameVibra;
+        save(GAME_VIBRA_KEY, gameVibra ? "1" : "0");
+        if (!gameVibra) playRumble(0);
+        renderMenu();
+        break;
+
+      case "floating":
+        prof().floating = !prof().floating;
+        saveProfiles();
+        renderMenu();
+        break;
+
+      case "profile":
+        switchProfile(Object.keys(profiles.list)[Number(arg)]);
+        renderMenu();
+        break;
+      case "profile-new": {
+        const name = askName("Nome do novo perfil (ex.: Bomba Patch, Corrida):", uniqueName("Perfil"));
+        if (!name) break;
+        // Novo perfil começa como cópia do atual
+        const finalName = uniqueName(name);
+        profiles.list[finalName] = copy(prof());
+        switchProfile(finalName);
+        renderMenu();
+        break;
+      }
+      case "profile-rename": {
+        const name = askName("Novo nome do perfil:", profiles.active);
+        if (!name || name === profiles.active || profiles.list[name]) break;
+        // Mantém a ordem dos perfis ao renomear
+        const list = {};
+        for (const [k, v] of Object.entries(profiles.list)) list[k === profiles.active ? name : k] = v;
+        profiles.list = list;
+        profiles.active = name;
+        saveProfiles();
+        renderMenu();
+        break;
+      }
+      case "profile-delete":
+        if (Object.keys(profiles.list).length < 2) break;
+        if (!deleteArmed) {
+          deleteArmed = true; // exclusão pede um segundo toque
+          renderMenu();
+          break;
+        }
+        deleteArmed = false;
+        delete profiles.list[profiles.active];
+        profiles.active = Object.keys(profiles.list)[0];
+        saveProfiles();
+        applyLayout(prof().layout);
+        syncGyro();
+        renderMenu();
+        break;
+
+      case "gyro":
+        prof().gyro = arg;
+        saveProfiles();
+        await syncGyro();
+        gyroNeedsCenter = true;
+        renderMenu();
+        break;
+      case "gyro-invert":
+        prof().gyroInvert = !prof().gyroInvert;
+        saveProfiles();
+        renderMenu();
+        break;
+      case "gyro-center":
+        if (gyroRaw) gyroCenter = { ...gyroRaw };
+        else gyroNeedsCenter = true;
+        haptic();
+        break;
+      case "open-https":
+        if (httpsUrl) location.href = httpsUrl;
+        break;
+
       case "reconnect":
         stopped = false;
         hideNotice();
@@ -715,6 +1108,7 @@
     if (document.hidden) {
       // App em segundo plano: nada pode ficar preso apertado no PC.
       releaseAll();
+      playRumble(0);
       send({ r: 1 });
     } else {
       requestWakeLock();
@@ -729,4 +1123,6 @@
 
   connect();
   requestWakeLock();
+  // Android libera o sensor sem pedir; no iPhone ele só liga depois de um toque no menu.
+  if (prof().gyro !== "off") startGyro();
 })();

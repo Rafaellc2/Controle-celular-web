@@ -54,6 +54,12 @@
       <div class="invite-body">
         <h2>Convide os jogadores</h2>
         <p class="muted">Na mesma rede Wi-Fi, abram este link (ou escaneiem o QR Code) e virem o celular na horizontal.</p>
+        <div id="link-tabs" class="tabs">
+          <button class="tab" data-link="fixed">Link fixo</button>
+          <button class="tab" data-link="ip">Pelo IP</button>
+          <button class="tab" data-link="https">Com giroscópio</button>
+        </div>
+        <p id="link-help" class="muted small-text"></p>
         <div class="link-row">
           <code id="url" class="url">—</code>
           <button class="btn" data-copy="url">Copiar link</button>
@@ -87,9 +93,12 @@
           <p class="meta muted"></p>
           <div class="live">
             <div class="mini-stick"><span class="mini-dot"></span></div>
+            <div class="mini-stick right"><span class="mini-dot"></span></div>
             <div class="held"></div>
+            <span class="rumble" title="Jogo mandando vibrar">📳</span>
           </div>
           <div class="slot-actions">
+            <button class="btn small find" title="Faz o celular vibrar e piscar">Achar</button>
             <select class="move"></select>
             <button class="btn small danger-ghost kick">Remover</button>
           </div>

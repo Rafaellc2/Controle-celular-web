@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- HUD: cada .item é posicionado pelo app.js (layout salvo no aparelho) -->
+  <!-- HUD: cada .item é posicionado pelo app.js (layout do perfil ativo, salvo no aparelho) -->
   <main id="pad">
     <div class="item btn shoulder" data-item="LT" data-btn="LT">L2</div>
     <div class="item btn shoulder" data-item="LB" data-btn="LB">L1</div>
@@ -26,12 +26,17 @@
       <div class="hub"></div>
     </div>
 
-    <div id="stick" class="item stick" data-item="STICK">
-      <div id="knob" class="knob"></div>
+    <div class="item stick" data-item="STICK" data-stick="L">
+      <div class="knob"></div>
+    </div>
+    <div class="item stick" data-item="RSTICK" data-stick="R">
+      <div class="knob"></div>
     </div>
 
     <div class="item btn small" data-item="BACK" data-btn="BACK">SELECT</div>
     <div class="item btn small" data-item="START" data-btn="START">START</div>
+    <div class="item btn round thumb" data-item="L3" data-btn="L3">L3</div>
+    <div class="item btn round thumb" data-item="R3" data-btn="R3">R3</div>
 
     <!-- Botões de ação (layout PlayStation, saída Xbox) -->
     <div class="item btn round triangle" data-item="Y" data-btn="Y">△</div>
@@ -63,20 +68,63 @@
   <!-- Menu de ajustes -->
   <div id="menu" class="overlay sheet-backdrop hidden" data-action="menu-close">
     <div class="sheet" data-action="noop">
-      <h2>Ajustes</h2>
-      <div class="sheet-btn" data-action="fullscreen">⛶ Tela cheia</div>
-      <div class="sheet-btn" data-action="edit">✎ Editar HUD</div>
-      <div class="sheet-label">Vibração ao apertar</div>
-      <div class="segmented" id="vibra">
-        <div class="seg" data-action="vibra:0">Desligada</div>
-        <div class="seg" data-action="vibra:1">Fraca</div>
-        <div class="seg" data-action="vibra:2">Média</div>
-        <div class="seg" data-action="vibra:3">Forte</div>
+      <div class="sheet-head">
+        <h2>Ajustes</h2>
+        <div class="mini-btn" data-action="menu-close">✕ Fechar</div>
       </div>
-      <div class="sheet-btn" data-action="vibra-test">📳 Testar vibração</div>
-      <p id="vibra-note" class="sheet-note"></p>
-      <div class="sheet-btn ghost" data-action="menu-close">Fechar</div>
+      <div class="sheet-cols">
+        <section class="sheet-col">
+          <div class="sheet-label">Perfil do HUD</div>
+          <div id="profiles" class="chips"></div>
+          <div class="row">
+            <div class="mini-btn" data-action="profile-new">+ Novo</div>
+            <div class="mini-btn" data-action="profile-rename">Renomear</div>
+            <div class="mini-btn danger" id="profile-delete" data-action="profile-delete">Excluir</div>
+          </div>
+          <div class="sheet-btn" data-action="edit">✎ Editar HUD</div>
+          <div class="toggle" data-action="floating">
+            <span>Analógico flutuante<small>aparece onde o dedo encostar (lado esquerdo)</small></span>
+            <span class="tg" id="tg-floating"></span>
+          </div>
+          <div class="sheet-btn" data-action="fullscreen">⛶ Tela cheia</div>
+        </section>
+
+        <section class="sheet-col">
+          <div class="sheet-label">Vibração ao apertar</div>
+          <div class="segmented" id="vibra">
+            <div class="seg" data-action="vibra:0">Desligada</div>
+            <div class="seg" data-action="vibra:1">Fraca</div>
+            <div class="seg" data-action="vibra:2">Média</div>
+            <div class="seg" data-action="vibra:3">Forte</div>
+          </div>
+          <div class="toggle" data-action="game-vibra">
+            <span>Vibração do jogo<small>o celular vibra quando o jogo manda</small></span>
+            <span class="tg" id="tg-game-vibra"></span>
+          </div>
+          <div class="row"><div class="mini-btn" data-action="vibra-test">📳 Testar vibração</div></div>
+          <p id="vibra-note" class="sheet-note"></p>
+
+          <div class="sheet-label">Giroscópio (analógico esquerdo)</div>
+          <div class="segmented" id="gyro">
+            <div class="seg" data-action="gyro:off">Desligado</div>
+            <div class="seg" data-action="gyro:steer">Volante</div>
+            <div class="seg" data-action="gyro:tilt">Inclinar</div>
+          </div>
+          <div class="row">
+            <div class="toggle compact" data-action="gyro-invert"><span>Inverter</span><span class="tg" id="tg-gyro-invert"></span></div>
+            <div class="mini-btn" data-action="gyro-center">◎ Centralizar</div>
+          </div>
+          <p id="gyro-note" class="sheet-note"></p>
+          <div id="gyro-https" class="sheet-btn hidden" data-action="open-https">🔒 Abrir link seguro</div>
+        </section>
+      </div>
     </div>
+  </div>
+
+  <!-- "Achar controle" disparado pelo painel do PC -->
+  <div id="find" class="overlay find hidden">
+    <div id="find-label" class="find-label">JOYSTICK-1</div>
+    <p>Este é o seu controle</p>
   </div>
 
   <div id="rotate" class="overlay rotate">

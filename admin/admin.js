@@ -20,6 +20,12 @@
   let state = null;
   let cards = [];
   let shownQrUrl = null;
+  let linkKind = localStorage.getItem("controle-admin-link") || "fixed";
+  const LINK_HELP = {
+    fixed: "Não muda quando o IP do PC muda, e o layout salvo no celular continua. Funciona no iPhone e no Android 12 ou mais novo.",
+    ip: "Funciona em qualquer celular, mas muda se o IP do PC mudar.",
+    https: "Necessário para o giroscópio. Na primeira vez o celular avisa que o certificado não é confiável: toque em Avançado → Continuar.",
+  };
 
   // ---------- Conexão com o servidor ----------
   function connect() {
@@ -59,10 +65,17 @@
       : "Acesso desligado: ninguém consegue entrar. Quem estava esperando entra sozinho quando você ligar.";
     note.classList.toggle("off", !s.enabled);
 
-    $("#url").textContent = s.url;
-    if (shownQrUrl !== s.url) {
-      $("#qr").innerHTML = s.qr || "";
-      shownQrUrl = s.url;
+    const links = s.links || { ip: s.url };
+    if (!links[linkKind]) linkKind = links.fixed ? "fixed" : "ip";
+    document.querySelectorAll("#link-tabs .tab").forEach((tab) => {
+      tab.classList.toggle("hidden", !links[tab.dataset.link]);
+      tab.classList.toggle("on", tab.dataset.link === linkKind);
+    });
+    $("#link-help").textContent = LINK_HELP[linkKind];
+    $("#url").textContent = links[linkKind];
+    if (shownQrUrl !== links[linkKind]) {
+      $("#qr").innerHTML = (s.qrs && s.qrs[linkKind]) || "";
+      shownQrUrl = links[linkKind];
     }
 
     // Avisos
@@ -108,6 +121,7 @@
       });
 
       el.querySelector(".kick").addEventListener("click", () => command({ cmd: "kick", slot: n }));
+      el.querySelector(".find").addEventListener("click", () => command({ cmd: "find", slot: n }));
 
       const input = el.querySelector(".player-name");
       const save = () => command({ cmd: "rename", slot: n, name: input.value });
@@ -149,7 +163,10 @@
     el.querySelector(".meta").textContent = `${p.device || "Celular"} · ${p.ip} · ${p.online ? "conectado há " + since(p.since) : "reconectando…"}`;
 
     const [x, y] = p.stick;
-    el.querySelector(".mini-dot").style.transform = `translate(${x * 17}px, ${y * 17}px)`;
+    el.querySelector(".mini-stick .mini-dot").style.transform = `translate(${x * 17}px, ${y * 17}px)`;
+    const [rx, ry] = p.rstick || [0, 0];
+    el.querySelector(".mini-stick.right .mini-dot").style.transform = `translate(${rx * 13}px, ${ry * 13}px)`;
+    el.querySelector(".rumble").classList.toggle("on", (p.rumble || 0) > 0);
 
     const held = el.querySelector(".held");
     const key = p.held.join(",");
@@ -175,6 +192,13 @@
 
   // ---------- Ações ----------
   enabledEl.addEventListener("change", () => command({ cmd: "enabled", value: enabledEl.checked }));
+  document.querySelectorAll("#link-tabs .tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      linkKind = tab.dataset.link;
+      try { localStorage.setItem("controle-admin-link", linkKind); } catch { /* sem armazenamento */ }
+      if (state) render(state);
+    });
+  });
   maxEl.addEventListener("change", () => command({ cmd: "max_players", value: Number(maxEl.value) }));
   $("#retry-backend").addEventListener("click", () => command({ cmd: "retry_backend" }));
 

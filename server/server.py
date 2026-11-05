@@ -4,9 +4,13 @@
   Cada celular recebe um slot próprio (JOYSTICK-1, JOYSTICK-2, ...).
 - Painel (somente neste computador): http://localhost:PORTA/admin
   liga/desliga o acesso, mostra o link/QR e os controles conectados.
+- Link fixo na rede: http://controle.local:PORTA (mDNS), não muda com o IP.
+- HTTPS opcional (certificado próprio) na porta --https-port, necessário
+  para o giroscópio do celular.
 
 Uso:
-    python server/server.py [--port 8080] [--max-players 4] [--dry-run] [--verbose]
+    python server/server.py [--port 8080] [--https-port 8443] [--name controle]
+                            [--max-players 4] [--dry-run] [--verbose]
 """
 
 import argparse
@@ -16,8 +20,8 @@ import json
 import logging
 import os
 import re
-import signal
 import socket
+import ssl
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -34,6 +38,10 @@ log = logging.getLogger("server")
 HUB = web.AppKey("hub", Hub)
 PORT = web.AppKey("port", int)
 TASKS = web.AppKey("tasks", list)
+STOP = web.AppKey("stop", asyncio.Event)
+NET = web.AppKey("net", dict)  # nome mDNS, porta HTTPS, zeroconf
+
+CERT_DIR = Path.home() / ".controle-web"
 
 
 def local_ip():
@@ -147,7 +155,8 @@ async def ws_player(request):
     hub.attach(player, ws)
     if old is not None and not old.closed:
         await old.close(code=4000, message=b"replaced")
-    await ws.send_json({"t": "hello", "slot": player.slot, "name": player.name})
+    links = hub.extra_state.get("links", {})
+    await ws.send_json({"t": "hello", "slot": player.slot, "name": player.name, "https": links.get("https")})
     hub.changed()
 
     try:
@@ -209,35 +218,159 @@ async def run_admin_command(app, cmd):
         await hub.move(int(cmd["slot"]), int(cmd["to"]))
     elif action == "rename":
         await hub.rename(int(cmd["slot"]), cmd["name"])
+    elif action == "find":
+        await hub.find(int(cmd["slot"]))
     elif action == "retry_backend":
         hub.retry_backend()
     elif action == "shutdown":
         log.info("Encerrando pelo painel.")
-        # Deixa a resposta sair antes; o run_app trata SIGINT com desligamento limpo.
-        asyncio.get_running_loop().call_later(0.2, os.kill, os.getpid(), signal.SIGINT)
+        # Deixa a resposta sair antes de desligar.
+        asyncio.get_running_loop().call_later(0.2, app[STOP].set)
+
+
+# ---------- HTTPS (certificado próprio) ----------
+def ensure_cert(ip, names):
+    """Gera (ou reaproveita) um certificado autoassinado para o IP e nomes atuais."""
+    try:
+        import datetime
+
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.x509.oid import NameOID
+    except ImportError:
+        log.warning("Pacote 'cryptography' ausente: HTTPS (giroscópio) desligado.")
+        return None
+
+    cert_file, key_file = CERT_DIR / "cert.pem", CERT_DIR / "key.pem"
+    ips = {ipaddress.ip_address(ip), ipaddress.ip_address("127.0.0.1")}
+    if cert_file.exists() and key_file.exists():
+        cert = x509.load_pem_x509_certificate(cert_file.read_bytes())
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+        still_valid = cert.not_valid_after_utc > datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
+        if still_valid and ips <= set(san.get_values_for_type(x509.IPAddress)) and set(names) <= set(san.get_values_for_type(x509.DNSName)):
+            return cert_file, key_file
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Controle Web")])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(days=1))
+        .not_valid_after(now + datetime.timedelta(days=825))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(n) for n in names] + [x509.IPAddress(i) for i in ips]),
+            critical=False,
+        )
+        .sign(key, hashes.SHA256())
+    )
+    CERT_DIR.mkdir(parents=True, exist_ok=True)
+    key_file.write_bytes(key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    os.chmod(key_file, 0o600)
+    cert_file.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    log.info("Certificado HTTPS gerado em %s", CERT_DIR)
+    return cert_file, key_file
+
+
+def make_ssl_context(ip, names):
+    files = ensure_cert(ip, names)
+    if not files:
+        return None
+    ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ctx.load_cert_chain(*map(str, files))
+    return ctx
+
+
+# ---------- Nome fixo na rede (mDNS) ----------
+async def start_mdns(app):
+    """Anuncia NOME.local apontando para este PC (funciona sem avahi/Bonjour)."""
+    net = app[NET]
+    try:
+        from zeroconf import ServiceInfo
+        from zeroconf.asyncio import AsyncZeroconf
+    except ImportError:
+        log.warning("Pacote 'zeroconf' ausente: link fixo %s.local desligado.", net["name"])
+        return
+    ip = local_ip()
+    info = ServiceInfo(
+        "_http._tcp.local.",
+        f"Controle Web ({net['name']})._http._tcp.local.",
+        addresses=[socket.inet_aton(ip)],
+        port=app[PORT],
+        server=f"{net['name']}.local.",
+    )
+    try:
+        zc = AsyncZeroconf()
+        await zc.async_register_service(info, allow_name_change=True)
+    except Exception as exc:
+        log.warning("Não foi possível anunciar %s.local: %s", net["name"], exc)
+        return
+    net.update(zc=zc, info=info, mdns_ip=ip)
+    log.info("Link fixo: http://%s.local:%d", net["name"], app[PORT])
+
+
+async def update_mdns(app):
+    net = app[NET]
+    ip = local_ip()
+    if "zc" not in net or net.get("mdns_ip") == ip:
+        return
+    net["info"].addresses = [socket.inet_aton(ip)]
+    net["mdns_ip"] = ip
+    await net["zc"].async_update_service(net["info"])
+    log.info("IP mudou: %s.local agora aponta para %s", net["name"], ip)
+
+
+async def stop_mdns(app):
+    net = app[NET]
+    if "zc" in net:
+        await net["zc"].async_unregister_service(net["info"])
+        await net["zc"].async_close()
 
 
 # ---------- Ciclo de vida ----------
 def refresh_extra(app):
     port = app[PORT]
-    url = f"http://{local_ip()}:{port}"
+    net = app[NET]
+    ip = local_ip()
     hub = app[HUB]
-    if hub.extra_state.get("url") != url:
-        hub.extra_state["url"] = url
-        hub.extra_state["qr"] = qr_svg(url)
-    hub.extra_state["firewall"] = firewall_status(port)
-    lan = ipaddress.ip_network(f"{local_ip()}/24", strict=False)
-    hub.extra_state["firewall_cmd"] = f"sudo ufw allow from {lan} to any port {port} proto tcp"
+    links = {"ip": f"http://{ip}:{port}"}
+    if "zc" in net:
+        links["fixed"] = f"http://{net['name']}.local:{port}"
+    if net.get("https_port"):
+        links["https"] = f"https://{ip}:{net['https_port']}"
+    if hub.extra_state.get("links") != links:
+        hub.extra_state["links"] = links
+        hub.extra_state["qrs"] = {k: qr_svg(v) for k, v in links.items()}
+        hub.extra_state["url"] = links["ip"]
+    ports = [port] + ([net["https_port"]] if net.get("https_port") else [])
+    hub.extra_state["firewall"] = all(firewall_status(p) is not False for p in ports) if firewall_status(port) is not None else None
+    lan = ipaddress.ip_network(f"{ip}/24", strict=False)
+    port_spec = f"port {port}" if len(ports) == 1 else f"port {','.join(map(str, ports))}"
+    hub.extra_state["firewall_cmd"] = f"sudo ufw allow from {lan} to any {port_spec} proto tcp"
     hub.extra_state["port"] = port
     hub.extra_state["platform"] = sys.platform
 
 
+async def housekeeping_extra(app):
+    refresh_extra(app)
+    try:
+        await update_mdns(app)
+    except Exception as exc:
+        log.warning("Falha ao atualizar mDNS: %s", exc)
+
+
 async def on_startup(app):
     hub = app[HUB]
+    await start_mdns(app)
     refresh_extra(app)
     hub.pad(1)  # cria o JOYSTICK-1 já na abertura e detecta problema de driver/permissão
     app[TASKS].append(asyncio.create_task(hub.admin_loop()))
-    app[TASKS].append(asyncio.create_task(hub.housekeeping_loop(lambda: refresh_extra(app))))
+    app[TASKS].append(asyncio.create_task(hub.housekeeping_loop(lambda: asyncio.create_task(housekeeping_extra(app)))))
 
 
 async def on_shutdown(app):
@@ -249,15 +382,37 @@ async def on_shutdown(app):
             await p.ws.close(code=1001, message=b"shutdown")
     for t in app[TASKS]:
         t.cancel()
+    await stop_mdns(app)
 
 
 async def on_cleanup(app):
     app[HUB].close_pads()
 
 
+async def run_server(app, host, port, https_port, ssl_ctx):
+    runner = web.AppRunner(app, handle_signals=True)
+    await runner.setup()
+    try:
+        await web.TCPSite(runner, host, port).start()
+        if ssl_ctx:
+            try:
+                await web.TCPSite(runner, host, https_port, ssl_context=ssl_ctx).start()
+            except OSError as exc:
+                log.warning("HTTPS na porta %d indisponível: %s", https_port, exc)
+                app[NET]["https_port"] = None
+                refresh_extra(app)
+        await app[STOP].wait()
+    finally:
+        await runner.cleanup()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Controle Web: celulares como gamepads Xbox 360")
     parser.add_argument("--port", type=int, default=int(os.environ.get("CONTROLE_WEB_PORT", "8080")))
+    parser.add_argument("--https-port", type=int, default=int(os.environ.get("CONTROLE_WEB_HTTPS_PORT", "8443")),
+                        help="porta HTTPS para o giroscópio (0 desliga)")
+    parser.add_argument("--name", default=os.environ.get("CONTROLE_WEB_NAME", "controle"),
+                        help="nome na rede: http://NOME.local")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--max-players", type=int, default=4)
     parser.add_argument("--dry-run", action="store_true", help="não cria controles virtuais, só loga")
@@ -271,10 +426,17 @@ def main():
     )
     logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 
+    ip = local_ip()
+    ssl_ctx = None
+    if args.https_port:
+        ssl_ctx = make_ssl_context(ip, [f"{args.name}.local", "localhost", f"{socket.gethostname()}.local"])
+
     app = web.Application()
     app[HUB] = Hub(dry_run=args.dry_run, max_players=args.max_players)
     app[PORT] = args.port
     app[TASKS] = []
+    app[STOP] = asyncio.Event()
+    app[NET] = {"name": args.name, "https_port": args.https_port if ssl_ctx else None}
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
     app.on_cleanup.append(on_cleanup)
@@ -287,15 +449,21 @@ def main():
     app.router.add_get("/admin/{name}", admin_static)
     app.router.add_static("/", PUBLIC_DIR)
 
-    url = f"http://{local_ip()}:{args.port}"
+    url = f"http://{ip}:{args.port}"
     print()
-    print("=" * 56)
+    print("=" * 60)
     print("  Controle Web rodando!")
     print(f"  Celulares (mesma Wi-Fi): {url}")
+    print(f"  Link fixo:               http://{args.name}.local:{args.port}")
+    if ssl_ctx:
+        print(f"  Com giroscópio (HTTPS):  https://{ip}:{args.https_port}")
     print(f"  Painel (este PC):        http://localhost:{args.port}/admin")
-    print("=" * 56)
+    print("=" * 60)
     print_qr(url)
-    web.run_app(app, host=args.host, port=args.port, print=None)
+    try:
+        asyncio.run(run_server(app, args.host, args.port, args.https_port, ssl_ctx))
+    except (web.GracefulExit, KeyboardInterrupt):
+        pass
 
 
 if __name__ == "__main__":

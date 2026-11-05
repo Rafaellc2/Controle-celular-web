@@ -70,6 +70,9 @@ class BaseGamepad:
     def close(self):
         pass
 
+    def attach_rumble(self, loop, callback):
+        """Liga a vibração vinda do jogo: callback(força 0..1, duração ms ou None)."""
+
 
 class VirtualGamepad(BaseGamepad):
     def __init__(self, slot):
@@ -107,6 +110,14 @@ class VirtualGamepad(BaseGamepad):
 
     def close(self):
         del self.pad  # vgamepad remove o controle do ViGEmBus ao liberar o objeto
+
+    def attach_rumble(self, loop, callback):
+        # O ViGEmBus avisa os motores numa thread própria; repassa para o loop asyncio.
+        def notify(client, target, large_motor, small_motor, led_number, user_data):
+            strength = max(large_motor, small_motor * 0.6) / 255
+            loop.call_soon_threadsafe(callback, strength, None)
+
+        self.pad.register_notification(callback_function=notify)
 
 
 class LinuxGamepad(BaseGamepad):
@@ -147,6 +158,8 @@ class LinuxGamepad(BaseGamepad):
                 (e.ABS_Z, trigger), (e.ABS_RZ, trigger),
                 (e.ABS_HAT0X, hat), (e.ABS_HAT0Y, hat),
             ],
+            # Vibração (force feedback), como o driver xpad anuncia
+            e.EV_FF: [e.FF_RUMBLE, e.FF_PERIODIC, e.FF_SQUARE, e.FF_TRIANGLE, e.FF_SINE, e.FF_GAIN],
         }
         self.dev = UInput(
             caps,
@@ -156,8 +169,13 @@ class LinuxGamepad(BaseGamepad):
             version=0x110,
             bustype=e.BUS_USB,
             phys=f"controle-web/joystick{slot}",
+            max_effects=16,
         )
         self._dpad = set()
+        self._effects = {}  # id do efeito -> (força 0..1, duração ms)
+        self._gain = 1.0
+        self._rumble_cb = None
+        self._loop = None
         log.info("JOYSTICK-%d: controle Xbox 360 virtual criado (uinput: %s).", slot, self.dev.device.path)
 
     def _button(self, name, pressed):
@@ -197,7 +215,57 @@ class LinuxGamepad(BaseGamepad):
         self.dev.syn()
 
     def close(self):
+        if self._loop is not None:
+            self._loop.remove_reader(self.dev.fd)
         self.dev.close()
+
+    def attach_rumble(self, loop, callback):
+        # Os jogos mandam os efeitos pelo próprio uinput. É obrigatório responder
+        # aos pedidos de upload/erase, senão o jogo trava esperando o kernel.
+        self._rumble_cb = callback
+        self._loop = loop
+        loop.add_reader(self.dev.fd, self._on_ff)
+
+    def _effect_strength(self, effect):
+        e = self._e
+        if effect.type == e.FF_RUMBLE:
+            r = effect.u.ff_rumble_effect
+            strength = max(r.strong_magnitude, r.weak_magnitude * 0.6) / 0xFFFF
+        elif effect.type == e.FF_PERIODIC:
+            strength = abs(effect.u.ff_periodic_effect.magnitude) / 0x7FFF
+        else:
+            strength = 0.0
+        return min(1.0, strength), effect.ff_replay.length
+
+    def _on_ff(self):
+        e = self._e
+        try:
+            events = list(self.dev.read())
+        except (BlockingIOError, OSError):
+            return
+        for ev in events:
+            if ev.type == e.EV_UINPUT:
+                if ev.code == e.UI_FF_UPLOAD:
+                    upload = self.dev.begin_upload(ev.value)
+                    self._effects[upload.effect.id] = self._effect_strength(upload.effect)
+                    upload.retval = 0
+                    self.dev.end_upload(upload)
+                elif ev.code == e.UI_FF_ERASE:
+                    erase = self.dev.begin_erase(ev.value)
+                    self._effects.pop(erase.effect_id, None)
+                    erase.retval = 0
+                    self.dev.end_erase(erase)
+            elif ev.type == e.EV_FF:
+                if ev.code == e.FF_GAIN:
+                    self._gain = ev.value / 0xFFFF
+                    continue
+                if self._rumble_cb is None:
+                    continue
+                if ev.value > 0:
+                    strength, length = self._effects.get(ev.code, (0.0, 0))
+                    self._rumble_cb(strength * self._gain, length or None)
+                else:
+                    self._rumble_cb(0.0, None)
 
 
 class DummyGamepad(BaseGamepad):

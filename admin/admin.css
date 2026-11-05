@@ -145,6 +145,19 @@ main {
   user-select: all;
 }
 .note { font-size: 14px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab {
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 12px;
+  border-radius: 99px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab.on { background: var(--accent); color: #0b0c10; border-color: var(--accent); }
 .note.off { color: var(--warn); }
 
 /* ---------- Controles ---------- */
@@ -230,7 +243,12 @@ select {
   border-radius: 50%;
   background: var(--c);
 }
-.held { display: flex; flex-wrap: wrap; gap: 4px; }
+.held { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.mini-stick.right { width: 36px; height: 36px; }
+.mini-stick.right .mini-dot { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
+.rumble { font-size: 18px; opacity: 0.15; transition: opacity 80ms; }
+.rumble.on { opacity: 1; animation: shake 120ms linear infinite; }
+@keyframes shake { 50% { transform: translateX(1px) rotate(4deg); } }
 .chip {
   font-size: 12px;
   font-weight: 700;
