@@ -218,6 +218,7 @@ html, body {
   background: var(--panel);
   color: var(--muted);
   font-size: 5vmin;
+  font-weight: 700;
 }
 
 /* ---------- Modo de edição ---------- */
@@ -242,11 +243,12 @@ body.editing .item.selected {
   z-index: 2;
 }
 
+/* Começa embaixo (só encosta na borda dos analógicos); ⇅ alterna cima/meio/baixo */
 .editbar {
   position: fixed;
   left: 50%;
-  top: max(1.5vmin, env(safe-area-inset-top));
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
   z-index: 6;
   display: flex;
   flex-direction: column;
@@ -257,11 +259,18 @@ body.editing .item.selected {
   background: rgba(28, 31, 39, 0.95);
   border: 1px solid var(--btn-edge);
 }
+.editbar.top {
+  top: max(1.5vmin, env(safe-area-inset-top));
+  transform: translateX(-50%);
+}
 .editbar.bottom {
   top: auto;
   bottom: max(1.5vmin, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
 }
 .edit-title { font-size: 3vmin; color: var(--muted); white-space: nowrap; }
+/* Enquanto arrasta um botão, a barra some para mostrar o que está embaixo */
+body.dragging .editbar { opacity: 0.12; pointer-events: none; }
 .edit-row { display: flex; gap: 1.2vmin; }
 .ebtn {
   min-width: 8vmin;

@@ -727,6 +727,7 @@
     const id = itemEl.dataset.item;
     select(id);
     drag = { id: t.identifier, item: id, startX: t.clientX, startY: t.clientY, ox: draft[id].x, oy: draft[id].y };
+    document.body.classList.add("dragging");
     touches.set(t.identifier, { kind: "edit" });
   }
 
@@ -757,6 +758,7 @@
     } else if (drag && t.identifier === drag.id) {
       drag = null;
       pinch = null;
+      document.body.classList.remove("dragging");
     }
   }
 
@@ -939,6 +941,7 @@
     touchPos.clear();
     drag = null;
     pinch = null;
+    document.body.classList.remove("dragging");
     for (const st of Object.values(sticks)) {
       if (st.touchId !== null) stickEnd(st);
     }
@@ -982,7 +985,13 @@
           updateEditbar();
         }
         break;
-      case "bar-move": editbarEl.classList.toggle("bottom"); break;
+      case "bar-move": {
+        // baixo → cima → meio → baixo
+        const pos = editbarEl.classList.contains("bottom") ? "top" : editbarEl.classList.contains("top") ? "" : "bottom";
+        editbarEl.classList.remove("top", "bottom");
+        if (pos) editbarEl.classList.add(pos);
+        break;
+      }
 
       case "vibra":
         vibraLevel = Number(arg);

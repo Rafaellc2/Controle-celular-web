@@ -158,7 +158,7 @@
 
     const input = el.querySelector(".player-name");
     if (document.activeElement !== input) input.value = p.name;
-    input.placeholder = p.device || "Nome do jogador";
+
 
     el.querySelector(".meta").textContent = `${p.device || "Celular"} · ${p.ip} · ${p.online ? "conectado há " + since(p.since) : "reconectando…"}`;
 
@@ -172,7 +172,7 @@
     const key = p.held.join(",");
     if (held.dataset.key !== key) {
       held.dataset.key = key;
-      held.innerHTML = "";
+      held.innerHTML = p.held.length ? "" : '<span class="idle muted">Nenhum botão</span>';
       for (const b of p.held) {
         const chip = document.createElement("span");
         chip.className = "chip";

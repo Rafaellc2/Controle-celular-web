@@ -89,18 +89,18 @@
           <p class="muted">Aguardando um celular…</p>
         </div>
         <div class="filled">
-          <input class="player-name" maxlength="24" placeholder="Nome do jogador" spellcheck="false">
+          <input class="player-name" maxlength="24" placeholder="✎ Dar nome ao jogador" spellcheck="false" title="Clique para dar um nome">
           <p class="meta muted"></p>
           <div class="live">
-            <div class="mini-stick"><span class="mini-dot"></span></div>
-            <div class="mini-stick right"><span class="mini-dot"></span></div>
-            <div class="held"></div>
-            <span class="rumble" title="Jogo mandando vibrar">📳</span>
+            <div class="mini-stick left" title="Analógico esquerdo"><span class="mini-dot"></span></div>
+            <div class="mini-stick right" title="Analógico direito"><span class="mini-dot"></span></div>
+            <div class="held"><span class="idle muted">Nenhum botão</span></div>
           </div>
+          <span class="rumble">📳 Vibrando</span>
           <div class="slot-actions">
+            <select class="move" title="Trocar de número com outro controle"></select>
             <button class="btn small find" title="Faz o celular vibrar e piscar">Achar</button>
-            <select class="move"></select>
-            <button class="btn small danger-ghost kick">Remover</button>
+            <button class="btn small danger-ghost kick" title="Desconecta e libera o número">Remover</button>
           </div>
         </div>
       </article>
