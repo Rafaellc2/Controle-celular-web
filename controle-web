@@ -1,0 +1,12 @@
+#!/bin/sh
+# Sobe o Controle Web (se ainda não estiver rodando) e abre o painel no Firefox.
+DIR=$(dirname "$(readlink -f "$0")")
+PORT=${CONTROLE_WEB_PORT:-8080}
+PING="http://127.0.0.1:$PORT/api/ping"
+PY="$DIR/.venv/bin/python"
+[ -x "$PY" ] || PY=python3
+if ! curl -sf -o /dev/null "$PING"; then
+    setsid "$PY" "$DIR/server/server.py" --port "$PORT" >"${XDG_RUNTIME_DIR:-/tmp}/controle-web.log" 2>&1 < /dev/null &
+    i=0; while [ $i -lt 30 ] && ! curl -sf -o /dev/null "$PING"; do sleep 0.2; i=$((i+1)); done
+fi
+setsid firefox --new-tab "http://localhost:$PORT/admin" >/dev/null 2>&1 < /dev/null &

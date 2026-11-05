@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Controle Web</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🎮</span>
+      <div>
+        <h1>Controle Web</h1>
+        <p id="summary" class="muted">Conectando ao servidor…</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <label class="switch" title="Permitir que celulares se conectem">
+        <input id="enabled" type="checkbox">
+        <span class="track"><span class="thumb"></span></span>
+        <span id="enabled-label" class="switch-label">Acesso</span>
+      </label>
+      <button id="shutdown" class="btn danger-ghost">Encerrar servidor</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="offline" class="banner bad hidden">
+      Servidor encerrado ou sem resposta. Abra <b>Controle Web</b> pelo menu de apps (Super + Space) para ligar de novo.
+    </div>
+    <div id="alert-firewall" class="banner warn hidden">
+      <div>
+        <b>Firewall bloqueando a porta <span class="port"></span>.</b>
+        Os celulares não vão conseguir abrir o link. Rode no terminal:
+      </div>
+      <div class="cmd"><code id="firewall-cmd"></code><button class="btn small" data-copy="firewall-cmd">Copiar</button></div>
+    </div>
+    <div id="alert-backend" class="banner warn hidden">
+      <div>
+        <b>Controles em modo de teste:</b> as entradas aparecem aqui, mas não chegam aos jogos.
+        <span id="backend-error" class="muted"></span>
+      </div>
+      <div id="backend-fix-linux" class="cmd hidden">
+        <code id="uinput-cmd">sudo setfacl -m u:$USER:rw /dev/uinput</code>
+        <button class="btn small" data-copy="uinput-cmd">Copiar</button>
+      </div>
+      <div id="backend-fix-windows" class="hidden">Instale o driver ViGEmBus (veja o README) e reinicie o PC.</div>
+      <button id="retry-backend" class="btn small">Tentar de novo</button>
+    </div>
+
+    <section class="card invite">
+      <div id="qr" class="qr" aria-label="QR Code do link"></div>
+      <div class="invite-body">
+        <h2>Convide os jogadores</h2>
+        <p class="muted">Na mesma rede Wi-Fi, abram este link (ou escaneiem o QR Code) e virem o celular na horizontal.</p>
+        <div class="link-row">
+          <code id="url" class="url">—</code>
+          <button class="btn" data-copy="url">Copiar link</button>
+        </div>
+        <p id="access-note" class="note"></p>
+      </div>
+    </section>
+
+    <section class="players-head">
+      <h2>Controles</h2>
+      <label class="max">
+        Jogadores
+        <select id="max-players"></select>
+      </label>
+    </section>
+    <p id="max-hint" class="muted small-text hidden">O Windows reconhece no máximo 4 controles XInput.</p>
+    <section id="slots" class="slots"></section>
+
+    <template id="slot-template">
+      <article class="slot-card">
+        <header class="slot-head">
+          <span class="slot-name"></span>
+          <span class="pill"></span>
+        </header>
+        <div class="empty">
+          <p>Livre</p>
+          <p class="muted">Aguardando um celular…</p>
+        </div>
+        <div class="filled">
+          <input class="player-name" maxlength="24" placeholder="Nome do jogador" spellcheck="false">
+          <p class="meta muted"></p>
+          <div class="live">
+            <div class="mini-stick"><span class="mini-dot"></span></div>
+            <div class="held"></div>
+          </div>
+          <div class="slot-actions">
+            <select class="move"></select>
+            <button class="btn small danger-ghost kick">Remover</button>
+          </div>
+        </div>
+      </article>
+    </template>
+  </main>
+
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

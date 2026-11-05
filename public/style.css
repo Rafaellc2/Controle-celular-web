@@ -1,0 +1,349 @@
+:root {
+  --bg: #111318;
+  --panel: #1c1f27;
+  --btn: #2a2e39;
+  --btn-edge: #3a3f4d;
+  --btn-pressed: #4b5266;
+  --text: #e6e8ef;
+  --muted: #8a90a2;
+  --cross: #7fa8ff;
+  --circle: #ff6b6b;
+  --square: #e58cff;
+  --triangle: #4fd1a5;
+  --ok: #4fd1a5;
+  --warn: #ffb547;
+  --bad: #ff6b6b;
+  --accent: #7fa8ff;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- HUD ---------- */
+#pad {
+  position: fixed;
+  inset: 0;
+}
+
+/* Posição (--x, --y em % da tela) e tamanho (--s) vêm do layout salvo */
+.item {
+  --s: 1;
+  --press: 1;
+  position: absolute;
+  left: calc(var(--x, 50) * 1%);
+  top: calc(var(--y, 50) * 1%);
+  transform: translate(-50%, -50%) scale(calc(var(--s) * var(--press)));
+}
+.item.is-hidden { display: none; }
+
+/* ---------- Botões genéricos ---------- */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--btn);
+  border: 0.5vmin solid var(--btn-edge);
+  color: var(--text);
+  font-weight: 700;
+  transition: background 40ms;
+}
+
+.btn * { pointer-events: none; }
+
+.btn.pressed {
+  --press: 0.92;
+  background: var(--btn-pressed);
+  box-shadow: 0 0 0 0.6vmin var(--accent);
+}
+
+.shoulder {
+  width: 20vmin;
+  height: 13vmin;
+  border-radius: 3vmin;
+  font-size: 5vmin;
+}
+
+.btn.small {
+  width: 19vmin;
+  height: 9vmin;
+  border-radius: 99px;
+  font-size: 3vmin;
+  letter-spacing: 0.1em;
+}
+
+.btn.round {
+  width: 18vmin;
+  height: 18vmin;
+  border-radius: 50%;
+  font-size: 8vmin;
+  font-weight: 400;
+}
+.triangle { color: var(--triangle); }
+.square   { color: var(--square); }
+.circle   { color: var(--circle); }
+.cross    { color: var(--cross); }
+
+/* ---------- D-pad ---------- */
+.dpad {
+  width: 36vmin;
+  height: 36vmin;
+}
+.dpad .arm {
+  position: absolute;
+  background: var(--btn);
+  border: 0.5vmin solid var(--btn-edge);
+  pointer-events: none;
+}
+.dpad .up, .dpad .down {
+  left: 33.33%;
+  width: 33.34%;
+  height: 38%;
+}
+.dpad .left, .dpad .right {
+  top: 33.33%;
+  height: 33.34%;
+  width: 38%;
+}
+.dpad .up    { top: 0;    border-radius: 2vmin 2vmin 0 0; }
+.dpad .down  { bottom: 0; border-radius: 0 0 2vmin 2vmin; }
+.dpad .left  { left: 0;   border-radius: 2vmin 0 0 2vmin; }
+.dpad .right { right: 0;  border-radius: 0 2vmin 2vmin 0; }
+.dpad .hub {
+  position: absolute;
+  left: 33.33%;
+  top: 33.33%;
+  width: 33.34%;
+  height: 33.34%;
+  background: var(--btn);
+  pointer-events: none;
+}
+.dpad .arm.pressed { background: var(--btn-pressed); border-color: var(--accent); }
+
+/* ---------- Analógico ---------- */
+.stick {
+  width: 40vmin;
+  height: 40vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--panel) 0%, #161920 70%);
+  border: 0.6vmin solid var(--btn-edge);
+}
+.knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18vmin;
+  height: 18vmin;
+  margin: -9vmin 0 0 -9vmin;
+  border-radius: 50%;
+  background: var(--btn-pressed);
+  border: 0.6vmin solid #5d6580;
+  pointer-events: none;
+  will-change: transform;
+}
+.stick.active .knob { background: #5d6580; }
+
+/* ---------- Topo: status + menu ---------- */
+.topbar {
+  position: fixed;
+  top: max(2vmin, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2vmin;
+  z-index: 5;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 1.5vmin;
+  padding: 1.2vmin 2.5vmin;
+  border-radius: 99px;
+  background: var(--panel);
+  font-size: 3.2vmin;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.status .dot {
+  width: 2.2vmin;
+  height: 2.2vmin;
+  border-radius: 50%;
+  background: var(--bad);
+}
+.status.on .dot { background: var(--ok); }
+.status.slow .dot { background: var(--warn); }
+.slot {
+  padding: 0.3vmin 1.6vmin;
+  border-radius: 99px;
+  background: var(--slot-color, var(--btn));
+  color: #0b0c10;
+  font-weight: 800;
+}
+
+.menu-btn {
+  width: 9vmin;
+  height: 9vmin;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 5vmin;
+}
+
+/* ---------- Modo de edição ---------- */
+body.editing #topbar { display: none; }
+body.editing #pad {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 5% 10%;
+}
+body.editing .item {
+  outline: 0.4vmin dashed rgba(255, 255, 255, 0.25);
+  outline-offset: 0.8vmin;
+}
+body.editing .item.is-hidden {
+  display: block;
+  opacity: 0.25;
+}
+body.editing .item.is-hidden.btn { display: flex; }
+body.editing .item.selected {
+  outline: 0.6vmin solid var(--accent);
+  z-index: 2;
+}
+
+.editbar {
+  position: fixed;
+  left: 50%;
+  top: max(1.5vmin, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1vmin;
+  padding: 1.5vmin 2vmin;
+  border-radius: 2.5vmin;
+  background: rgba(28, 31, 39, 0.95);
+  border: 1px solid var(--btn-edge);
+}
+.editbar.bottom {
+  top: auto;
+  bottom: max(1.5vmin, env(safe-area-inset-bottom));
+}
+.edit-title { font-size: 3vmin; color: var(--muted); white-space: nowrap; }
+.edit-row { display: flex; gap: 1.2vmin; }
+.ebtn {
+  min-width: 8vmin;
+  height: 8vmin;
+  padding: 0 2vmin;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.5vmin;
+  background: var(--btn);
+  border: 1px solid var(--btn-edge);
+  font-size: 3.2vmin;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ebtn.primary { background: var(--accent); color: #0b0c10; border-color: var(--accent); }
+
+/* ---------- Menu ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3vmin;
+  background: rgba(10, 11, 15, 0.96);
+  text-align: center;
+  font-size: 5vmin;
+  padding: 6vmin;
+}
+.overlay .hint { color: var(--muted); font-size: 4vmin; }
+
+.sheet-backdrop { background: rgba(10, 11, 15, 0.75); }
+.sheet {
+  width: min(80vw, 110vmin);
+  max-height: 92vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2vmin;
+  padding: 3.5vmin;
+  border-radius: 3vmin;
+  background: var(--panel);
+  border: 1px solid var(--btn-edge);
+  font-size: 3.8vmin;
+  text-align: left;
+}
+.sheet h2 { font-size: 5vmin; }
+.sheet-btn {
+  padding: 2.2vmin 3vmin;
+  border-radius: 2vmin;
+  background: var(--btn);
+  border: 1px solid var(--btn-edge);
+  font-weight: 700;
+}
+.sheet-btn.ghost { background: transparent; text-align: center; color: var(--muted); }
+.sheet-label { color: var(--muted); font-size: 3.2vmin; margin-top: 1vmin; }
+.sheet-note { color: var(--warn); font-size: 3vmin; }
+.sheet-note:empty { display: none; }
+.segmented { display: flex; gap: 1vmin; }
+.seg {
+  flex: 1;
+  padding: 2vmin 0;
+  text-align: center;
+  border-radius: 1.5vmin;
+  background: var(--btn);
+  border: 1px solid var(--btn-edge);
+  font-weight: 700;
+  font-size: 3.2vmin;
+}
+.seg.on { background: var(--accent); color: #0b0c10; border-color: var(--accent); }
+
+/* ---------- Avisos ---------- */
+.rotate { display: none; }
+.rotate-icon { font-size: 20vmin; }
+
+@media (orientation: portrait) {
+  .rotate { display: flex; }
+}
+
+/* Switch escondido usado para vibrar no iPhone */
+.haptic {
+  position: fixed;
+  left: -100px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

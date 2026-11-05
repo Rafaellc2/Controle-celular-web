@@ -1,0 +1,244 @@
+:root {
+  --bg: #111318;
+  --panel: #1a1d25;
+  --panel-2: #222632;
+  --edge: #2e3341;
+  --text: #e6e8ef;
+  --muted: #8a90a2;
+  --ok: #4fd1a5;
+  --warn: #ffb547;
+  --bad: #ff6b6b;
+  --accent: #7fa8ff;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+h1 { font-size: 20px; }
+h2 { font-size: 17px; }
+code { font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", monospace; }
+.muted { color: var(--muted); }
+.small-text { font-size: 13px; }
+.hidden { display: none !important; }
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ---------- Topo ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--edge);
+  background: var(--panel);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { font-size: 30px; }
+.top-actions { display: flex; align-items: center; gap: 16px; }
+
+/* ---------- Botões ---------- */
+.btn {
+  border: 1px solid var(--edge);
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn.danger-ghost { background: transparent; color: var(--bad); border-color: #4a2b31; }
+.btn.danger-ghost:hover { border-color: var(--bad); }
+.btn.confirm { background: var(--bad); color: #12090b; }
+
+/* ---------- Interruptor de acesso ---------- */
+.switch { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.track {
+  width: 52px;
+  height: 30px;
+  border-radius: 99px;
+  background: #3a3f4d;
+  position: relative;
+  transition: background 150ms;
+}
+.thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 150ms;
+}
+.switch input:checked + .track { background: var(--ok); }
+.switch input:checked + .track .thumb { transform: translateX(22px); }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch-label { font-weight: 700; min-width: 150px; }
+
+/* ---------- Avisos ---------- */
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.banner.warn { border-color: #6b5225; background: #2a2318; }
+.banner.bad { border-color: #6b2f37; background: #2a181b; }
+.banner .btn { align-self: flex-start; }
+.cmd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cmd code {
+  background: #0c0d11;
+  padding: 6px 10px;
+  border-radius: 6px;
+  user-select: all;
+}
+
+/* ---------- Convite ---------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  padding: 20px;
+}
+.invite { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.qr {
+  width: 180px;
+  height: 180px;
+  flex: none;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px;
+}
+.qr svg { width: 100%; height: 100%; display: block; }
+.qr path { fill: #000; }
+.invite-body { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 10px; }
+.link-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.url {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  background: #0c0d11;
+  padding: 8px 14px;
+  border-radius: 8px;
+  user-select: all;
+}
+.note { font-size: 14px; }
+.note.off { color: var(--warn); }
+
+/* ---------- Controles ---------- */
+.players-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.max { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font: inherit;
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.slot-card {
+  --c: var(--accent);
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-top: 4px solid var(--c);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 210px;
+}
+.slot-card.is-empty { opacity: 0.65; border-top-style: dashed; }
+.slot-card.is-active { box-shadow: 0 0 0 1px var(--c), 0 0 18px -6px var(--c); }
+
+.slot-head { display: flex; justify-content: space-between; align-items: center; }
+.slot-name { font-weight: 800; letter-spacing: 0.04em; color: var(--c); }
+.pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+.pill.online { background: #183a30; color: var(--ok); }
+.pill.away { background: #3a2f18; color: var(--warn); }
+
+.empty { margin: auto 0; text-align: center; }
+.empty p:first-child { font-weight: 700; font-size: 18px; }
+.filled { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+
+.player-name {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 2px 6px;
+  margin-left: -6px;
+}
+.player-name:hover, .player-name:focus { border-color: var(--edge); outline: none; background: #0c0d11; }
+.meta { font-size: 13px; }
+
+.live { display: flex; gap: 12px; align-items: center; min-height: 52px; }
+.mini-stick {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--edge);
+  position: relative;
+}
+.mini-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--c);
+}
+.held { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--c);
+  color: #0b0c10;
+}
+
+.slot-actions { display: flex; gap: 8px; margin-top: auto; }
+.slot-actions select { flex: 1; font-size: 13px; }

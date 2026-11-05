@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#111318">
+  <title>Web Controller</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- HUD: cada .item é posicionado pelo app.js (layout salvo no aparelho) -->
+  <main id="pad">
+    <div class="item btn shoulder" data-item="LT" data-btn="LT">L2</div>
+    <div class="item btn shoulder" data-item="LB" data-btn="LB">L1</div>
+    <div class="item btn shoulder" data-item="RB" data-btn="RB">R1</div>
+    <div class="item btn shoulder" data-item="RT" data-btn="RT">R2</div>
+
+    <div id="dpad" class="item dpad" data-item="DPAD">
+      <div class="arm up" data-dir="UP"></div>
+      <div class="arm down" data-dir="DOWN"></div>
+      <div class="arm left" data-dir="LEFT"></div>
+      <div class="arm right" data-dir="RIGHT"></div>
+      <div class="hub"></div>
+    </div>
+
+    <div id="stick" class="item stick" data-item="STICK">
+      <div id="knob" class="knob"></div>
+    </div>
+
+    <div class="item btn small" data-item="BACK" data-btn="BACK">SELECT</div>
+    <div class="item btn small" data-item="START" data-btn="START">START</div>
+
+    <!-- Botões de ação (layout PlayStation, saída Xbox) -->
+    <div class="item btn round triangle" data-item="Y" data-btn="Y">△</div>
+    <div class="item btn round square" data-item="X" data-btn="X">□</div>
+    <div class="item btn round circle" data-item="B" data-btn="B">○</div>
+    <div class="item btn round cross" data-item="A" data-btn="A">✕</div>
+  </main>
+
+  <!-- Topo: status + menu -->
+  <div id="topbar" class="topbar">
+    <div id="status" class="status off"><span id="slot" class="slot">J?</span><span class="dot"></span><span id="status-text">Conectando…</span></div>
+    <div class="menu-btn" data-action="menu">⚙</div>
+  </div>
+
+  <!-- Barra do modo de edição -->
+  <div id="editbar" class="editbar hidden">
+    <div class="edit-title" id="edit-title">Toque num botão para editar</div>
+    <div class="edit-row">
+      <div class="ebtn" data-action="size-down">−</div>
+      <div class="ebtn" data-action="size-up">+</div>
+      <div class="ebtn" id="toggle-hide" data-action="toggle-hide">Ocultar</div>
+      <div class="ebtn" data-action="bar-move" title="Mover esta barra">⇅</div>
+      <div class="ebtn" data-action="reset">Padrão</div>
+      <div class="ebtn" data-action="cancel">Cancelar</div>
+      <div class="ebtn primary" data-action="save">Salvar</div>
+    </div>
+  </div>
+
+  <!-- Menu de ajustes -->
+  <div id="menu" class="overlay sheet-backdrop hidden" data-action="menu-close">
+    <div class="sheet" data-action="noop">
+      <h2>Ajustes</h2>
+      <div class="sheet-btn" data-action="fullscreen">⛶ Tela cheia</div>
+      <div class="sheet-btn" data-action="edit">✎ Editar HUD</div>
+      <div class="sheet-label">Vibração ao apertar</div>
+      <div class="segmented" id="vibra">
+        <div class="seg" data-action="vibra:0">Desligada</div>
+        <div class="seg" data-action="vibra:1">Fraca</div>
+        <div class="seg" data-action="vibra:2">Média</div>
+        <div class="seg" data-action="vibra:3">Forte</div>
+      </div>
+      <p id="vibra-note" class="sheet-note"></p>
+      <div class="sheet-btn ghost" data-action="menu-close">Fechar</div>
+    </div>
+  </div>
+
+  <div id="rotate" class="overlay rotate">
+    <div class="rotate-icon">⟳</div>
+    <p>Gire o celular para a horizontal</p>
+  </div>
+
+  <div id="notice" class="overlay hidden" data-action="reconnect">
+    <p id="notice-title"></p>
+    <p id="notice-hint" class="hint"></p>
+  </div>
+
+  <!-- iPhone (Safari 18+): alternar este switch gera uma vibração curta -->
+  <label id="haptic" class="haptic" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
+
+  <script src="app.js"></script>
+</body>
+</html>
