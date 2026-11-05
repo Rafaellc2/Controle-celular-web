@@ -150,6 +150,24 @@
     }
   }
 
+  // Diagnóstico: diz se o bloqueio é do navegador ou do celular
+  function testVibra() {
+    const note = $("#vibra-note");
+    if (!canVibrate) {
+      if (IS_IOS) {
+        hapticEl.click();
+        note.textContent = "iPhone: o Safari não tem vibração para sites. Tentei o truque do iOS 18; se não sentiu, não há como vibrar.";
+      } else {
+        note.textContent = "Este navegador não tem vibração para sites. Use o Chrome ou o Samsung Internet.";
+      }
+      return;
+    }
+    const ok = navigator.vibrate([80, 60, 80]);
+    note.textContent = ok
+      ? "Pedido de vibração aceito pelo navegador. Se não sentiu, o celular está bloqueando: desative o modo silencioso/Não perturbe e ligue \"Vibração ao tocar\" (Configurações → Sons e vibração)."
+      : "O navegador recusou a vibração. Toque em qualquer lugar da tela uma vez e teste de novo.";
+  }
+
   function renderVibra() {
     document.querySelectorAll("#vibra .seg").forEach((el) => {
       el.classList.toggle("on", el.dataset.action === `vibra:${vibraLevel}`);
@@ -632,6 +650,7 @@
     }
     switch (name) {
       case "menu": openMenu(); break;
+      case "vibra-test": testVibra(); break;
       case "menu-close": closeMenu(); break;
       case "edit": enterEdit(); break;
       case "save": exitEdit(true); haptic(); break;
