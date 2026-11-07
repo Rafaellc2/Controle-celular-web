@@ -55,9 +55,13 @@
   const GAME_VIBRA_KEY = "controle-vibra-jogo";
 
   // Giroscópio: ângulo (graus) para o analógico ir até o fim
-  const GYRO_STEER_MAX = 28;
-  const GYRO_TILT_MAX = 22;
-  const GYRO_DEADZONE = 2;
+  // (por perfil: "ângulo" = quanto girar para ir até o fim, "zona morta" = giro ignorado no centro)
+  const GYRO_RANGE_DEFAULT = 28;   // volante; "inclinar" usa a mesma proporção (22/28)
+  const GYRO_RANGE_MIN = 10;
+  const GYRO_RANGE_MAX = 90;
+  const GYRO_TILT_RATIO = 22 / 28;
+  const GYRO_DEAD_DEFAULT = 2;
+  const GYRO_DEAD_MAX = 15;
 
   // ---------- Armazenamento local (pode falhar em aba anônima) ----------
   function load(key) {
@@ -121,7 +125,7 @@
   }
 
   // ---------- Perfis (layout + ajustes por jogo) ----------
-  // { active: "Padrão", list: { "Padrão": { layout, floating, gyro, gyroInvert } } }
+  // { active: "Padrão", list: { "Padrão": { layout, floating, gyro, gyroInvert, gyroRange, gyroDead } } }
   function normalizeLayout(saved) {
     const layout = copy(DEFAULT_LAYOUT);
     if (!saved || typeof saved !== "object") return layout;
@@ -139,7 +143,8 @@
   }
 
   function newProfile(layout) {
-    return { layout: normalizeLayout(layout), floating: false, gyro: "off", gyroInvert: false };
+    return { layout: normalizeLayout(layout), floating: false, gyro: "off", gyroInvert: false,
+      gyroRange: GYRO_RANGE_DEFAULT, gyroDead: GYRO_DEAD_DEFAULT };
   }
 
   function loadProfiles() {
@@ -157,6 +162,8 @@
         floating: Boolean(p.floating),
         gyro: ["off", "steer", "tilt"].includes(p.gyro) ? p.gyro : "off",
         gyroInvert: Boolean(p.gyroInvert),
+        gyroRange: Number.isFinite(p.gyroRange) ? clamp(p.gyroRange, GYRO_RANGE_MIN, GYRO_RANGE_MAX) : GYRO_RANGE_DEFAULT,
+        gyroDead: Number.isFinite(p.gyroDead) ? clamp(p.gyroDead, 0, GYRO_DEAD_MAX) : GYRO_DEAD_DEFAULT,
       };
     }
     if (!data.list[data.active]) data.active = Object.keys(data.list)[0];
@@ -667,9 +674,9 @@
     applyGyro();
   }
 
-  function gyroAxis(value, max) {
-    const v = Math.abs(value) < GYRO_DEADZONE ? 0 : value - Math.sign(value) * GYRO_DEADZONE;
-    return round2(clamp(v / (max - GYRO_DEADZONE), -1, 1));
+  function gyroAxis(value, max, dead) {
+    const v = Math.abs(value) < dead ? 0 : value - Math.sign(value) * dead;
+    return round2(clamp(v / Math.max(1, max - dead), -1, 1));
   }
 
   function applyGyro() {
@@ -677,9 +684,10 @@
     if (!gyroRaw || st.touchId !== null || editing) return; // dedo no analógico tem prioridade
     const p = prof();
     const sign = p.gyroInvert ? -1 : 1;
-    st.x = sign * gyroAxis(gyroRaw.roll - gyroCenter.roll, GYRO_STEER_MAX);
+    const dead = Math.min(p.gyroDead, p.gyroRange - 1);
+    st.x = sign * gyroAxis(gyroRaw.roll - gyroCenter.roll, p.gyroRange, dead);
     // Inclinar para frente (topo do celular se afastando) = analógico para cima
-    st.y = p.gyro === "tilt" ? sign * gyroAxis(gyroCenter.pitch - gyroRaw.pitch, GYRO_TILT_MAX) : 0;
+    st.y = p.gyro === "tilt" ? sign * gyroAxis(gyroCenter.pitch - gyroRaw.pitch, p.gyroRange * GYRO_TILT_RATIO, dead) : 0;
     scheduleStick(st);
   }
 
@@ -884,6 +892,8 @@
     $("#screen-note").textContent = screenWanted && !screenAllowed
       ? "A transmissão está desligada no painel do PC (ou o PC não consegue capturar a tela)." : "";
     $("#tg-gyro-invert").classList.toggle("on", p.gyroInvert);
+    $("#gyro-range-val").textContent = `${p.gyroRange}°`;
+    $("#gyro-dead-val").textContent = `${p.gyroDead}°`;
 
     document.querySelectorAll("#vibra .seg").forEach((el) => {
       el.classList.toggle("on", el.dataset.action === `vibra:${vibraLevel}`);
@@ -1168,6 +1178,16 @@
         break;
       case "gyro-invert":
         prof().gyroInvert = !prof().gyroInvert;
+        saveProfiles();
+        renderMenu();
+        break;
+      case "gyro-range":
+        prof().gyroRange = clamp(prof().gyroRange + Number(arg), GYRO_RANGE_MIN, GYRO_RANGE_MAX);
+        saveProfiles();
+        renderMenu();
+        break;
+      case "gyro-dead":
+        prof().gyroDead = clamp(prof().gyroDead + Number(arg), 0, GYRO_DEAD_MAX);
         saveProfiles();
         renderMenu();
         break;

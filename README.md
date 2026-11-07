@@ -186,6 +186,9 @@ deslizar o dedo de um botão de ação para outro sem levantar.
 - **Giroscópio** (precisa do link HTTPS): **Volante** controla o analógico
   esquerdo girando o celular; **Inclinar** usa também frente/trás.
   **Centralizar** define a posição neutra; **Inverter** troca o sentido.
+  **Girar para o máximo** (10° a 90°, padrão 28°) define quanto girar para o
+  analógico ir até o fim: menor = mais sensível. **Zona morta** (0° a 15°) é o
+  giro ignorado perto do centro. Ambos valem por perfil.
   Encostar no analógico tem prioridade sobre o giroscópio.
 
 ## 5. Configurar o emulador

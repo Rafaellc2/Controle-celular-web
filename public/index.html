@@ -125,6 +125,18 @@
             <div class="toggle compact" data-action="gyro-invert"><span>Inverter</span><span class="tg" id="tg-gyro-invert"></span></div>
             <div class="mini-btn" data-action="gyro-center">◎ Centralizar</div>
           </div>
+          <div class="stepper">
+            <span>Girar para o máximo<small>quanto menor, mais sensível</small></span>
+            <div class="mini-btn" data-action="gyro-range:-2">−</div>
+            <b id="gyro-range-val">28°</b>
+            <div class="mini-btn" data-action="gyro-range:2">+</div>
+          </div>
+          <div class="stepper">
+            <span>Zona morta<small>giro ignorado no centro</small></span>
+            <div class="mini-btn" data-action="gyro-dead:-1">−</div>
+            <b id="gyro-dead-val">2°</b>
+            <div class="mini-btn" data-action="gyro-dead:1">+</div>
+          </div>
           <p id="gyro-note" class="sheet-note"></p>
           <div id="gyro-https" class="sheet-btn hidden" data-action="open-https">🔒 Abrir link seguro</div>
         </section>

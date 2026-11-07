@@ -384,6 +384,20 @@ body.dragging .editbar { opacity: 0.12; pointer-events: none; }
   border: 1px solid var(--btn-edge);
   font-weight: 700;
 }
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 1.5vmin;
+  padding: 1.2vmin 2.4vmin;
+  border-radius: 1.5vmin;
+  background: var(--btn);
+  border: 1px solid var(--btn-edge);
+  font-size: 3.2vmin;
+  font-weight: 700;
+}
+.stepper > span { flex: 1; }
+.stepper small { display: block; font-weight: 400; color: var(--muted); font-size: 2.8vmin; }
+.stepper b { min-width: 9vmin; text-align: center; }
 .toggle small { display: block; font-weight: 400; color: var(--muted); font-size: 2.8vmin; }
 .toggle.compact { padding: 1.2vmin 2.4vmin; font-size: 3.2vmin; }
 .tg {
