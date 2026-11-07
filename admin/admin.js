@@ -60,6 +60,11 @@
 
     enabledEl.checked = s.enabled;
     const sc = s.screen || {};
+    for (const [id, key] of [["screen-width", "width"], ["screen-fps", "fps"], ["screen-quality", "quality"]]) {
+      const el = $("#" + id);
+      if (sc[key] !== undefined && document.activeElement !== el) el.value = String(sc[key]);
+    }
+    $("#screen-cfg").classList.toggle("hidden", sc.available === false);
     screenEl.checked = Boolean(sc.enabled);
     screenEl.disabled = sc.available === false;
     $("#screen-label").textContent = sc.available === false ? "Tela do PC indisponível (falta ffmpeg/gpu-screen-recorder)"
@@ -88,6 +93,7 @@
 
     // Avisos
     $("#alert-firewall").classList.toggle("hidden", s.firewall !== false);
+    document.querySelectorAll(".lan-ip").forEach((el) => { el.textContent = s.lan_ip || ""; });
     document.querySelectorAll(".port").forEach((el) => { el.textContent = s.port; });
     $("#firewall-cmd").textContent = s.firewall_cmd || "";
 
@@ -209,6 +215,14 @@
       if (state) render(state);
     });
   });
+  for (const id of ["screen-width", "screen-fps", "screen-quality"]) {
+    $("#" + id).addEventListener("change", () => command({
+      cmd: "screen_config",
+      width: Number($("#screen-width").value),
+      fps: Number($("#screen-fps").value),
+      quality: Number($("#screen-quality").value),
+    }));
+  }
   maxEl.addEventListener("change", () => command({ cmd: "max_players", value: Number(maxEl.value) }));
   $("#retry-backend").addEventListener("click", () => command({ cmd: "retry_backend" }));
 

@@ -162,6 +162,10 @@ main {
 .note.off { color: var(--warn); }
 
 /* ---------- Controles ---------- */
+.screen-cfg { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--edge, #2b3040); }
+.screen-cfg h2 { font-size: 16px; width: 100%; }
+.screen-cfg label { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.screen-cfg p { width: 100%; }
 .players-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
 .max { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 select {

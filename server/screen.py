@@ -40,7 +40,7 @@ class Viewer:
 
 
 class Screen:
-    def __init__(self, width=960, fps=30, quality=5, monitor=None, on_change=None):
+    def __init__(self, width=1280, fps=60, quality=6, monitor=None, on_change=None):
         self.width = width
         self.fps = fps
         self.quality = quality  # -q:v do MJPEG: 2 (melhor) a 31 (pior)
@@ -63,6 +63,9 @@ class Screen:
             "enabled": self.enabled,
             "available": self.available,
             "viewers": len(self.viewers),
+            "width": self.width,
+            "fps": self.fps,
+            "quality": self.quality,
             "error": self.error,
         }
 
@@ -93,6 +96,17 @@ class Screen:
         self.viewers.discard(viewer)
         if not self.viewers and self._task and self._idle is None:
             self._idle = asyncio.get_running_loop().call_later(IDLE_STOP_SECONDS, self._stop_if_idle)
+        self.on_change()
+
+    async def configure(self, width, fps, quality):
+        """Muda resolução/fps/qualidade; se estiver transmitindo, reinicia a captura na hora."""
+        self.width = max(320, min(3840, int(width))) // 2 * 2
+        self.fps = max(10, min(120, int(fps)))
+        self.quality = max(2, min(31, int(quality)))
+        if self._task:
+            await self.stop()
+            if self.viewers:
+                self._task = asyncio.create_task(self._supervise())
         self.on_change()
 
     def _stop_if_idle(self):
@@ -185,7 +199,7 @@ class Screen:
             height = round(self.width * size[1] / size[0] / 2) * 2
             gsr = subprocess.Popen(
                 ["gpu-screen-recorder", "-w", monitor, "-c", "mpegts", "-k", "h264",
-                 "-f", str(self.fps), "-s", f"{self.width}x{height}", "-q", "high",
+                 "-f", str(self.fps), "-s", f"{self.width}x{height}", "-q", "very_high",
                  "-fm", "cfr", "-keyint", "0.5", "-a", "", "-o", "/dev/stdout"],
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             )

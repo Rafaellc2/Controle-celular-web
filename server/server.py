@@ -44,6 +44,24 @@ NET = web.AppKey("net", dict)  # nome mDNS, porta HTTPS, zeroconf
 SCREEN = web.AppKey("screen", Screen)
 
 CERT_DIR = Path.home() / ".controle-web"
+SCREEN_CONFIG = CERT_DIR / "screen.json"
+SCREEN_DEFAULTS = {"width": 1280, "fps": 60, "quality": 6}
+
+
+def load_screen_config():
+    try:
+        saved = json.loads(SCREEN_CONFIG.read_text())
+    except (OSError, ValueError):
+        return {}
+    return {k: saved[k] for k in SCREEN_DEFAULTS if isinstance(saved.get(k), int)}
+
+
+def save_screen_config(screen):
+    try:
+        CERT_DIR.mkdir(parents=True, exist_ok=True)
+        SCREEN_CONFIG.write_text(json.dumps({"width": screen.width, "fps": screen.fps, "quality": screen.quality}))
+    except OSError as exc:
+        log.warning("Não foi possível salvar a qualidade da tela: %s", exc)
 
 
 def local_ip():
@@ -81,8 +99,11 @@ def print_qr(url):
         pass
 
 
-def firewall_status(port):
-    """True/False se o ufw está ativo e a porta liberada/bloqueada; None se não há ufw."""
+def firewall_status(port, ip=None):
+    """True/False se o ufw está ativo e a porta liberada/bloqueada; None se não há ufw.
+
+    Com `ip`, só conta a regra que vale para a rede atual (regra "from 192.168.0.0/24"
+    não libera quem está na 192.168.1.x)."""
     try:
         with open("/etc/ufw/ufw.conf") as f:
             if "ENABLED=yes" not in f.read():
@@ -91,8 +112,20 @@ def firewall_status(port):
             rules = f.read()
     except OSError:
         return None
-    pattern = re.compile(rf"^-A ufw-user-input -p tcp .*--dport {port}\b.*-j ACCEPT", re.M)
-    return bool(pattern.search(rules))
+    for line in rules.splitlines():
+        if not line.startswith("-A ufw-user-input -p tcp") or not line.endswith("-j ACCEPT"):
+            continue
+        if not re.search(rf"--dports? ([\d,:]+,)?{port}\b|--dport {port}\b", line):
+            continue
+        src = re.search(r" -s (\S+)", line)
+        if not src or not ip:
+            return True
+        try:
+            if ipaddress.ip_address(ip) in ipaddress.ip_network(src.group(1), strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 # ---------- Acesso restrito ao painel ----------
@@ -252,6 +285,10 @@ async def run_admin_command(app, cmd):
         await hub.find(int(cmd["slot"]))
     elif action == "screen":
         await set_screen_enabled(app, bool(cmd["value"]))
+    elif action == "screen_config":
+        screen = app[SCREEN]
+        await screen.configure(cmd["width"], cmd["fps"], cmd["quality"])
+        save_screen_config(screen)
     elif action == "retry_backend":
         hub.retry_backend()
     elif action == "shutdown":
@@ -397,7 +434,8 @@ def refresh_extra(app):
         hub.extra_state["qrs"] = {k: qr_svg(v) for k, v in links.items()}
         hub.extra_state["url"] = links["ip"]
     ports = [port] + ([net["https_port"]] if net.get("https_port") else [])
-    hub.extra_state["firewall"] = all(firewall_status(p) is not False for p in ports) if firewall_status(port) is not None else None
+    hub.extra_state["firewall"] = all(firewall_status(p, ip) is not False for p in ports) if firewall_status(port, ip) is not None else None
+    hub.extra_state["lan_ip"] = ip
     lan = ipaddress.ip_network(f"{ip}/24", strict=False)
     port_spec = f"port {port}" if len(ports) == 1 else f"port {','.join(map(str, ports))}"
     hub.extra_state["firewall_cmd"] = f"sudo ufw allow from {lan} to any {port_spec} proto tcp"
@@ -467,9 +505,9 @@ def main():
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--max-players", type=int, default=4)
     parser.add_argument("--screen", action="store_true", help="já começa com a transmissão da tela do PC ligada")
-    parser.add_argument("--screen-width", type=int, default=960, help="largura da imagem enviada ao celular")
-    parser.add_argument("--screen-fps", type=int, default=30, help="quadros por segundo da transmissão")
-    parser.add_argument("--screen-quality", type=int, default=5, help="qualidade JPEG: 2 (melhor) a 31 (pior)")
+    parser.add_argument("--screen-width", type=int, help="largura da imagem enviada ao celular (padrão 1280; o painel também ajusta)")
+    parser.add_argument("--screen-fps", type=int, help="quadros por segundo da transmissão (padrão 60)")
+    parser.add_argument("--screen-quality", type=int, help="qualidade JPEG: 2 (melhor) a 31 (pior) (padrão 6)")
     parser.add_argument("--screen-monitor", default=None, help="monitor a transmitir (ex.: eDP-1); padrão: o primeiro")
     parser.add_argument("--dry-run", action="store_true", help="não cria controles virtuais, só loga")
     parser.add_argument("--verbose", action="store_true", help="loga também o movimento dos analógicos")
@@ -490,7 +528,9 @@ def main():
     app = web.Application()
     app[HUB] = Hub(dry_run=args.dry_run, max_players=args.max_players)
     app[PORT] = args.port
-    app[SCREEN] = Screen(width=args.screen_width, fps=args.screen_fps, quality=args.screen_quality,
+    cfg = {**SCREEN_DEFAULTS, **load_screen_config()}
+    cfg.update({k: v for k, v in (("width", args.screen_width), ("fps", args.screen_fps), ("quality", args.screen_quality)) if v})
+    app[SCREEN] = Screen(width=cfg["width"], fps=cfg["fps"], quality=cfg["quality"],
                          monitor=args.screen_monitor, on_change=lambda: sync_screen_state(app))
     app[SCREEN].enabled = args.screen
     app[TASKS] = []

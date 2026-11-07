@@ -36,7 +36,7 @@
     </div>
     <div id="alert-firewall" class="banner warn hidden">
       <div>
-        <b>Firewall bloqueando a porta <span class="port"></span>.</b>
+        <b>Firewall bloqueando a porta <span class="port"></span> nesta rede (<span class="lan-ip"></span>).</b>
         Os celulares não vão conseguir abrir o link. Rode no terminal:
       </div>
       <div class="cmd"><code id="firewall-cmd"></code><button class="btn small" data-copy="firewall-cmd">Copiar</button></div>
@@ -71,6 +71,35 @@
         </div>
         <p id="access-note" class="note"></p>
       </div>
+    </section>
+
+    <section class="screen-cfg" id="screen-cfg">
+      <h2>Tela do PC no celular</h2>
+      <label>Resolução
+        <select id="screen-width">
+          <option value="854">480p</option>
+          <option value="1280">720p</option>
+          <option value="1600">900p</option>
+          <option value="1920">1080p</option>
+        </select>
+      </label>
+      <label>FPS
+        <select id="screen-fps">
+          <option value="30">30</option>
+          <option value="45">45</option>
+          <option value="60">60</option>
+          <option value="90">90</option>
+        </select>
+      </label>
+      <label>Qualidade (bitrate)
+        <select id="screen-quality">
+          <option value="10">Baixa · ~25 Mbps (720p 60 fps)</option>
+          <option value="6">Média · ~40 Mbps</option>
+          <option value="4">Alta · ~55 Mbps</option>
+          <option value="2">Máxima · 75+ Mbps, só Wi-Fi 5 GHz bom</option>
+        </select>
+      </label>
+      <p id="screen-cfg-note" class="muted small-text">Mais resolução, FPS e qualidade pedem Wi-Fi 5 GHz e mais CPU/GPU do PC. A mudança vale na hora.</p>
     </section>
 
     <section class="players-head">

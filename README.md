@@ -70,7 +70,7 @@ Opções:
 | `--name NOME` | Link fixo `http://NOME.local` (padrão `controle`)          |
 | `--max-players N` | Quantidade inicial de controles (padrão 4, máx. 8; muda no painel) |
 | `--screen`   | Já começa com a transmissão da tela ligada (liga/desliga também no painel) |
-| `--screen-width N` / `--screen-fps N` / `--screen-quality N` / `--screen-monitor NOME` | Largura (960), fps (30), qualidade JPEG 2–31 (5) e monitor da transmissão |
+| `--screen-width N` / `--screen-fps N` / `--screen-quality N` / `--screen-monitor NOME` | Largura (1280), fps (60), qualidade JPEG 2–31 (6); o painel também ajusta e guarda em `~/.controle-web/screen.json` e monitor da transmissão |
 | `--dry-run`  | Não cria o controle virtual; só mostra as entradas no log   |
 | `--verbose`  | Loga também os movimentos do analógico                      |
 
