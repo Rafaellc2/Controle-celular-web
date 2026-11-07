@@ -1,51 +1,61 @@
-# Controle Web — celulares como controles de Xbox 360 no PC
+# Web Controller — turn phones into Xbox 360 gamepads on your PC
 
-Use a tela do smartphone (navegador, mesma rede Wi-Fi) como gamepad para jogar
-emuladores como **PCSX2** e **PPSSPP** (Bomba Patch) no Windows ou no Linux.
-Vários celulares ao mesmo tempo: cada um vira um **JOYSTICK-1, 2, 3...**
+[English](README.md) · [Português (Brasil)](README.pt-BR.md)
 
-O servidor Python cria um **controle Xbox 360 virtual** pelo driver **ViGEmBus**;
-para o Windows e para o emulador ele é idêntico a um controle físico.
+Use your smartphone's screen (in the browser, on the same Wi-Fi) as a gamepad to
+play emulators such as **PCSX2** and **PPSSPP** on Windows or Linux.
+Several phones at once: each one becomes **JOYSTICK-1, 2, 3...**
 
-```
-Celular (navegador)  --WebSocket/Wi-Fi-->  server.py  --vgamepad-->  ViGEmBus  -->  Emulador
-```
-
-## Estrutura
+A Python server creates a **virtual Xbox 360 controller** (through the
+**ViGEmBus** driver on Windows, or the kernel's `uinput` on Linux). To the
+operating system and the emulator it looks exactly like a physical controller.
 
 ```
-controle-web     # lançador: sobe o servidor (se preciso) e abre o painel
+Phone (browser)  --WebSocket/Wi-Fi-->  server.py  --vgamepad/uinput-->  Virtual Xbox 360  -->  Emulator
+```
+
+**Features:** multi-touch gamepad · customizable HUD with profiles per game
+(position, size, opacity, invisible-but-working buttons) · right stick · floating stick ·
+gyroscope steering · game rumble on the phone · optional live PC screen as the
+controller background · PIN protection · admin panel with QR code · fixed
+`controle.local` link.
+
+## Structure
+
+```
+controle-web     # launcher: starts the server (if needed) and opens the panel
 server/
-  server.py      # HTTP + WebSockets (/ws celulares, /admin/ws painel), IP e QR Code
-  screen.py      # transmissão da tela do PC (MJPEG) para o fundo do controle
-  hub.py         # slots JOYSTICK-N, reservas, comandos do painel
-  gamepad.py     # controle virtual por slot (ViGEmBus, uinput ou só log em --dry-run)
-admin/           # painel (só abre em http://localhost neste PC)
+  server.py      # HTTP + WebSockets (/ws phones, /screen video, /admin/ws panel), IP and QR code
+  screen.py      # PC screen streaming (MJPEG) to the controller background
+  hub.py         # JOYSTICK-N slots, reservations, panel commands
+  gamepad.py     # virtual controller per slot (ViGEmBus, uinput, or log-only with --dry-run)
+admin/           # panel (only opens at http://localhost on this PC)
 public/
-  index.html     # layout do controle
+  index.html     # controller layout
   style.css
-  app.js         # multi-touch, envio otimizado, reconexão automática
+  i18n.js        # English and Portuguese texts (browser language, or ?lang=en|pt)
+  app.js         # multi-touch, optimized sending, automatic reconnection
 requirements.txt
 ```
 
-## 1. Instalação no Windows
+## 1. Installation on Windows
 
 ### 1.1 Python
-Instale o **Python 3.10 ou superior** em <https://www.python.org/downloads/>.
-No instalador, marque **"Add python.exe to PATH"**.
+Install **Python 3.10 or newer** from <https://www.python.org/downloads/>.
+In the installer, check **"Add python.exe to PATH"**.
 
-### 1.2 Driver ViGEmBus
-1. Baixe o instalador mais recente em
+### 1.2 ViGEmBus driver
+1. Download the latest installer from
    <https://github.com/nefarius/ViGEmBus/releases>
-   (arquivo `ViGEmBus_1.22.0_x64_x86_arm64.exe` ou versão mais nova).
-2. Execute e conclua a instalação.
-3. Reinicie o computador.
+   (`ViGEmBus_1.22.0_x64_x86_arm64.exe` or newer).
+2. Run it and finish the installation.
+3. Restart the computer.
 
-> Ao rodar `pip install vgamepad` no Windows, o pacote também pode abrir o
-> instalador do ViGEmBus automaticamente. Se já estiver instalado, apenas feche.
+> Running `pip install vgamepad` on Windows may also launch the ViGEmBus
+> installer automatically. If it is already installed, just close it.
 
-### 1.3 Dependências do projeto
-Abra o PowerShell na pasta do projeto:
+### 1.3 Project dependencies
+Open PowerShell in the project folder:
 
 ```powershell
 python -m venv .venv
@@ -53,254 +63,263 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## 2. Executar
+## 2. Run
 
 ```powershell
 python server/server.py
 ```
 
-O terminal mostra o endereço (ex.: `http://192.168.0.15:8080`), o **PIN** de 6 dígitos e um
-**QR Code**. Escanear o QR já entra (ele leva o PIN); abrindo o link à mão, o celular pede o
-PIN uma vez. O PIN também aparece no painel, com o botão **Novo PIN**.
+The terminal shows the address (e.g. `http://192.168.0.15:8080`), a 6-digit **PIN**
+and a **QR code**. Scanning the QR code joins right away (it carries the PIN); if you
+open the link by hand, the phone asks for the PIN once. The PIN is also shown in the
+panel, with a **New PIN** button.
 
-> **Segurança:** use só em redes em que você confia. Sem o PIN, qualquer aparelho na mesma
-> Wi-Fi viraria um controle (e, com a Tela do PC ligada, veria a sua tela). O PIN trava o
-> aparelho por 5 minutos depois de 5 erros. O tráfego não é criptografado (HTTP), então não
-> use em Wi-Fi pública.
+> **Security:** only use this on networks you trust. Without the PIN, any device on the
+> same Wi-Fi would become a controller (and, with PC Screen on, could see your screen).
+> The PIN locks a device out for 5 minutes after 5 wrong attempts. Traffic is not
+> encrypted (HTTP), so do not use it on public Wi-Fi.
 
-Opções:
+Options:
 
-| Opção        | Efeito                                                      |
-|--------------|-------------------------------------------------------------|
-| `--port N`   | Muda a porta (padrão `8080`, ou `CONTROLE_WEB_PORT`)        |
-| `--https-port N` | Porta HTTPS para o giroscópio (padrão `8443`; `0` desliga) |
-| `--name NOME` | Link fixo `http://NOME.local` (padrão `controle`)          |
-| `--max-players N` | Quantidade inicial de controles (padrão 4, máx. 8; muda no painel) |
-| `--screen-width N` / `--screen-fps N` / `--screen-quality N` / `--screen-monitor NOME` | Largura (1920), fps (60), qualidade JPEG 2–31 (6); o painel também ajusta e guarda em `~/.controle-web/screen.json` e monitor da transmissão |
-| `--no-pin`   | Não pede PIN (só em rede de confiança)                      |
-| `--dry-run`  | Não cria o controle virtual; só mostra as entradas no log   |
-| `--verbose`  | Loga também os movimentos do analógico                      |
+| Option | Effect |
+|--------|--------|
+| `--port N` | Changes the port (default `8080`, or `CONTROLE_WEB_PORT`) |
+| `--https-port N` | HTTPS port for the gyroscope (default `8443`; `0` turns it off) |
+| `--name NAME` | Fixed link `http://NAME.local` (default `controle`) |
+| `--max-players N` | Initial number of controllers (default 4, max 8; changeable in the panel) |
+| `--screen-width N`, `--screen-fps N`, `--screen-quality N`, `--screen-monitor NAME` | Width (default 1920), fps (60), JPEG quality 2–31 (6) and monitor of the screen stream. The panel also adjusts them and saves to `~/.controle-web/screen.json` |
+| `--no-pin` | Do not ask for a PIN (trusted networks only) |
+| `--dry-run` | Do not create the virtual controller; only log the inputs |
+| `--verbose` | Also log analog stick movement |
 
 ### Firewall
-Na primeira execução o Windows pergunta se o Python pode acessar a rede:
-permita em **Redes privadas**. Confirme também que sua conexão Wi-Fi está como
-perfil **Privado** (Configurações → Rede e Internet → Wi-Fi → propriedades).
-No Linux com ufw, libere as duas portas (o painel mostra o comando):
+On first run Windows asks whether Python may access the network: allow it on
+**Private networks**. Also make sure your Wi-Fi connection is set to the **Private**
+profile (Settings → Network & Internet → Wi-Fi → properties).
+On Linux with ufw, open both ports (the panel shows the command):
 `sudo ufw allow from 192.168.0.0/24 to any port 8080,8443 proto tcp`.
+The rule is per network: if you move to another network (e.g. `192.168.1.x`), the panel
+warns you and shows the command for the new one.
 
 ### Links
-O painel mostra três links (com QR Code):
+The panel shows three links (with a QR code):
 
-| Link | Quando usar |
+| Link | When to use |
 |------|-------------|
-| **Link fixo** `http://controle.local:8080` | Padrão. Não muda quando o IP do PC muda, então o layout salvo no celular continua. iPhone e Android 12+. |
-| **Pelo IP** `http://192.168.x.x:8080` | Celular que não abre o `.local`. |
-| **Com giroscópio** `https://192.168.x.x:8443` | Para usar o giroscópio (o navegador só libera o sensor em HTTPS). Na primeira vez aparece o aviso de certificado: **Avançado → Continuar**. |
+| **Fixed link** `http://controle.local:8080` | Default. Does not change when the PC's IP changes, so the layout saved on the phone stays. iPhone and Android 12+. |
+| **By IP** `http://192.168.x.x:8080` | Phones that can't open `.local`. |
+| **With gyroscope** `https://192.168.x.x:8443` | To use the gyroscope (browsers only expose the sensor over HTTPS). The first time a certificate warning appears: **Advanced → Continue**. |
 
-O certificado HTTPS é gerado sozinho em `~/.controle-web/`. Cada link guarda
-seus próprios perfis no celular (o navegador separa por endereço).
+The HTTPS certificate is generated automatically in `~/.controle-web/`. Each link keeps
+its own profiles on the phone (the browser separates them by address).
 
-## 3. Conectar o celular
+## 3. Connect the phone
 
-1. Celular e PC na **mesma rede Wi-Fi**.
-2. Escaneie o QR Code (ou digite o endereço no Chrome/Safari).
-3. Gire o celular para a **horizontal** e toque em **⛶ Tela cheia**.
-4. O indicador no topo mostra o status e a latência (ping ida e volta).
+1. Phone and PC on the **same Wi-Fi network**.
+2. Scan the QR code (or type the address in Chrome/Safari).
+3. Turn the phone to **landscape** and tap **⛶ Fullscreen**.
+4. The indicator at the top shows the status and latency (round-trip ping).
 
-Para abrir mais rápido depois, use "Adicionar à tela inicial" no navegador.
+To open it faster later, use "Add to home screen" in the browser.
 
-## 3b. Painel e vários jogadores
+## 3b. Panel and multiple players
 
-Abra **http://localhost:8080/admin** no PC (só funciona neste computador).
-No Linux, o app **Controle Web** no menu (Super + Space) sobe o servidor e
-abre o painel direto.
+Open **http://localhost:8080/admin** on the PC (it only works on this computer).
+On Linux, the **Web Controller** app in the launcher starts the server and opens the
+panel directly.
 
-- **Acesso ligado/desligado:** desligado, ninguém entra e quem estava
-  conectado sai. Os celulares ficam esperando e entram sozinhos quando você
-  religar.
-- **Link e QR Code** para passar aos amigos, com botão de copiar.
-- **Controles:** um cartão por JOYSTICK-N com o aparelho, IP, ping, botões
-  apertados, os dois analógicos e a vibração do jogo ao vivo (bom para
-  testar). Dá para dar nome ao jogador, **achar** (o celular dele pisca na
-  cor do JOYSTICK e vibra), **mover** para outro número (troca com quem
-  estiver lá) ou **remover**.
-- **Jogadores:** quantos controles existem (1 a 8).
-- **Avisos:** firewall bloqueando a porta, ou controle virtual em modo de
-  teste (sem driver/permissão), com o comando para resolver.
-- **Encerrar servidor:** desliga tudo (clique duas vezes).
+- **Access on/off:** when off, nobody can join and everyone connected is dropped.
+  Phones keep waiting and rejoin by themselves when you turn it back on.
+- **PC screen:** turns the screen stream on/off and sets resolution, FPS and quality.
+- **PIN** with a **New PIN** button (disconnects the phones).
+- **Link and QR code** to share with friends, with a copy button.
+- **Controllers:** one card per JOYSTICK-N with the device, IP, ping, pressed buttons,
+  both analog sticks and the game's rumble live (good for testing). You can name the
+  player, **find** (their phone flashes in the JOYSTICK color and vibrates), **move** to
+  another number (swaps with whoever is there) or **remove**.
+- **Players:** how many controllers exist (1 to 8).
+- **Warnings:** firewall blocking the port on the current network, or the virtual
+  controller in test mode (no driver/permission), with the command to fix it.
+- **Shut down server:** turns everything off (click twice).
 
-Cada celular guarda um ID no navegador. Se cair, o número dele fica
-reservado por 60 s e ele volta para o mesmo JOYSTICK. Com a sala cheia, um
-celular novo pega a vaga de quem caiu há mais tempo.
+Each phone stores an ID in the browser. If it drops, its number stays reserved for 60 s
+and it returns to the same JOYSTICK. With a full room, a new phone takes the slot of
+whoever dropped longest ago.
 
-Os controles virtuais são criados em ordem (JOYSTICK-1 primeiro) e ficam
-existindo até encerrar o servidor, para o emulador não perder o mapeamento.
+Virtual controllers are created in order (JOYSTICK-1 first) and stay until the server
+shuts down, so the emulator does not lose its mapping.
 
-### Atalho no menu (Linux)
+### Launcher shortcut (Linux)
 
-Crie `~/.local/share/applications/controle-web.desktop` apontando para o
-lançador:
+Create `~/.local/share/applications/controle-web.desktop` pointing to the launcher:
 
 ```ini
 [Desktop Entry]
 Type=Application
-Name=Controle Web
-Comment=Celulares como controles de videogame para jogar com os amigos
-Exec=/caminho/para/controle_celular_web/controle-web
+Name=Web Controller
+Comment=Phones as game controllers to play with friends
+Exec=/path/to/controle_celular_web/controle-web
 Icon=input-gaming
 Terminal=false
 Categories=Game;Utility;
 ```
 
-O log do servidor fica em `$XDG_RUNTIME_DIR/controle-web.log`.
+The server log is at `$XDG_RUNTIME_DIR/controle-web.log`.
 
-## 4. Layout e mapeamento
+## 4. Layout and mapping
 
-| Tela (PlayStation) | Controle virtual (Xbox 360) |
-|--------------------|-----------------------------|
-| ✕                  | A                           |
-| ○                  | B                           |
-| □                  | X                           |
-| △                  | Y                           |
-| L1 / R1            | LB / RB                     |
-| L2 / R2            | LT / RT (gatilho total)     |
-| SELECT / START     | Back / Start                |
-| D-pad              | D-pad (com diagonais)       |
-| Analógico esquerdo / direito | Analógicos esquerdo / direito |
-| L3 / R3 (ocultos no padrão) | Clique dos analógicos |
+| Screen (PlayStation) | Virtual controller (Xbox 360) |
+|----------------------|-------------------------------|
+| ✕ | A |
+| ○ | B |
+| □ | X |
+| △ | Y |
+| L1 / R1 | LB / RB |
+| L2 / R2 | LT / RT (full trigger) |
+| SELECT / START | Back / Start |
+| D-pad | D-pad (with diagonals) |
+| Left / right stick | Left / right stick |
+| L3 / R3 (disabled by default) | Stick clicks |
 
-Multi-touch: dá para segurar R1 (correr) e apertar ✕/○/□ ao mesmo tempo, e
-deslizar o dedo de um botão de ação para outro sem levantar.
+Multi-touch: you can hold R1 (run) and press ✕/○/□ at the same time, and slide a finger
+from one action button to another without lifting it.
 
-### Ajustes no celular (⚙)
+### Settings on the phone (☰)
 
-- **Perfis do HUD:** um layout e ajustes por jogo (ex.: "Bomba Patch",
-  "Corrida"). **+ Novo** copia o perfil atual. Tudo fica salvo no celular.
-- **Editar HUD:** arraste para mover, pinça com dois dedos (ou − / +) para o
-  tamanho, **◐ − / +** para a transparência (sem nenhum botão selecionado
-  muda todos de uma vez), **Desativar/Ativar** botões (L3/R3 começam desativados) e **Invisível/Visível**:
-  o botão some da tela mas continua funcionando. Na edição, borda verde =
-  aparece na tela, vermelha (e transparente) = invisível, tracejada = desativado.
-- **Tela do PC no fundo:** mostra a tela do computador atrás do controle.
-  Primeiro ligue **Tela do PC** no painel (vem desligada por segurança) e
-  depois ative no menu do celular. No Linux/Wayland usa `gpu-screen-recorder`
-  + `ffmpeg` (precisam estar instalados); no Windows usa só o `ffmpeg`.
-  Jogos em tela cheia exclusiva podem aparecer pretos: use janela sem borda.
-- **Analógico flutuante:** o analógico esquerdo aparece onde o dedo encostar
-  no lado esquerdo da tela.
-- **Vibração ao apertar:** desligada, fraca, média ou forte, com botão de teste.
-- **Vibração do jogo:** o celular vibra quando o jogo manda vibrar o
-  controle (Linux e Windows).
-- **Giroscópio** (precisa do link HTTPS): **Volante** controla o analógico
-  esquerdo girando o celular; **Inclinar** usa também frente/trás.
-  **Centralizar** define a posição neutra; **Inverter** troca o sentido.
-  **Girar para o máximo** (10° a 90°, padrão 28°) define quanto girar para o
-  analógico ir até o fim: menor = mais sensível. **Zona morta** (0° a 15°) é o
-  giro ignorado perto do centro. Ambos valem por perfil.
-  Encostar no analógico tem prioridade sobre o giroscópio.
+- **HUD profiles:** a layout and settings per game (e.g. "Racing", "Fighting").
+  **+ New** copies the current profile. Everything is saved on the phone.
+- **Edit HUD:** drag to move, pinch with two fingers (or − / +) to resize, **◐ − / +**
+  for transparency (with no button selected it changes all of them at once),
+  **Disable/Enable** buttons (L3/R3 start disabled) and **Invisible/Visible**: the
+  button disappears from the screen but keeps working. While editing, a green border
+  = shown on screen, red (and transparent) = invisible, dashed = disabled.
+- **PC screen as background:** shows your computer's screen behind the controller.
+  First turn on **PC screen** in the panel (it is off by default for security), then
+  enable it in the phone's menu. On Linux/Wayland it uses `gpu-screen-recorder` +
+  `ffmpeg` (both must be installed); on Windows it only needs `ffmpeg`. Exclusive
+  fullscreen games may show up black: use windowed/borderless mode. The server sends at
+  most 2 unacknowledged frames, so a slow network lowers the FPS instead of adding delay.
+- **Floating stick:** the left stick appears wherever your finger touches the left side
+  of the screen.
+- **Vibration on press:** off, low, medium or strong, with a test button.
+- **Game vibration:** the phone vibrates when the game rumbles the controller (Linux and
+  Windows).
+- **Gyroscope** (needs the HTTPS link): **Steering** drives the left stick by turning
+  the phone; **Tilt** also uses forward/back. **Center** sets the neutral position;
+  **Invert** flips the direction. **Turn for full range** (10° to 90°, default 28°) sets
+  how far to turn for the stick to reach the end: lower = more sensitive. **Dead zone**
+  (0° to 15°) is the rotation ignored near the center. Both are per profile. Touching
+  the stick takes priority over the gyroscope.
+- **Language:** the interface follows the browser language (English or Portuguese). Add
+  `?lang=en` or `?lang=pt` to the address to force one.
 
-## 5. Configurar o emulador
+## 5. Configure the emulator
 
-Deixe o servidor rodando **e o celular conectado** antes de abrir o emulador,
-para que o controle virtual já exista.
+Leave the server running **and the phone connected** before opening the emulator, so the
+virtual controller already exists.
 
 ### PCSX2 (2.x)
-1. **Configurações → Controles**.
-2. **Porta de Controle 1** → tipo **DualShock 2**.
-3. Clique em **Mapeamento Automático** (Automatic Mapping) e escolha
-   **XInput-0** (ou SDL-0 "Xbox 360 Controller").
-4. Pronto: ✕ = Cruz, ○ = Círculo, □ = Quadrado, △ = Triângulo, L1/R1/L2/R2 iguais.
+1. **Settings → Controllers**.
+2. **Controller Port 1** → type **DualShock 2**.
+3. Click **Automatic Mapping** and choose **XInput-0** (or SDL-0 "Xbox 360 Controller").
+4. Done: ✕ = Cross, ○ = Circle, □ = Square, △ = Triangle, L1/R1/L2/R2 the same.
 
 ### PPSSPP
-1. **Configurações → Controles → Mapeamento de controles**.
-2. Os padrões para XInput costumam já funcionar. Se não, clique em cada ação
-   e pressione o botão correspondente no celular.
-3. Analógico: mapeie **Analógico para cima/baixo/esquerda/direita** para o
-   analógico esquerdo.
+1. **Settings → Controls → Control mapping**.
+2. The XInput defaults usually already work. If not, click each action and press the
+   matching button on the phone.
+3. Analog: map **Analog up/down/left/right** to the left stick.
 
-### Verificar se o Windows enxerga o controle
-Pressione `Win + R`, digite `joy.cpl` e abra o "Controller (XBOX 360 For
-Windows)". Os botões acendem quando você toca no celular.
+### Check that Windows sees the controller
+Press `Win + R`, type `joy.cpl` and open "Controller (XBOX 360 For Windows)". The buttons
+light up when you touch the phone.
 
 ## 5b. Linux
 
-No Linux o controle virtual é criado pelo `uinput` do kernel (sem ViGEmBus),
-com os mesmos IDs de um controle Xbox 360 (driver `xpad`). Steam, SDL,
-PCSX2, PPSSPP e RetroArch reconhecem normalmente.
+On Linux the virtual controller is created through the kernel's `uinput` (no ViGEmBus),
+with the same IDs as an Xbox 360 controller (`xpad` driver). Steam, SDL, PCSX2, PPSSPP
+and RetroArch recognize it normally.
 
 ```bash
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-Por padrão só o root acessa `/dev/uinput`. Libere para seu usuário:
+By default only root can access `/dev/uinput`. Grant access to your user:
 
-- **Temporário (até reiniciar):**
+- **Temporary (until reboot):**
   ```bash
   sudo setfacl -m u:$USER:rw /dev/uinput
   ```
-- **Permanente** (acesso para o usuário logado na sessão local):
+- **Permanent** (access for the user logged in on the local session):
   ```bash
   echo 'KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"' \
     | sudo tee /etc/udev/rules.d/60-uinput.rules
   ```
-  e reinicie o computador.
+  and restart the computer.
 
-> Aviso: acesso ao `uinput` permite que programas do seu usuário simulem
-> teclado e mouse. Dê essa permissão só em máquina pessoal.
+> Warning: access to `uinput` lets programs running as your user simulate keyboard and
+> mouse. Only grant it on a personal machine.
 
-Rode `.venv/bin/python server/server.py`. O log deve mostrar
-`Controle Xbox 360 virtual criado (uinput: /dev/input/eventN)`.
+For the PC screen stream, install `ffmpeg` and `gpu-screen-recorder` (Wayland/Hyprland,
+GPU-accelerated). On X11 without `gpu-screen-recorder`, `ffmpeg` alone (x11grab) is used.
 
-Para conferir: abra <https://hardwaretester.com/gamepad> no navegador do PC,
-ou rode `.venv/bin/python -m evdev.evtest` e escolha "Microsoft X-Box 360 pad".
+Run `.venv/bin/python server/server.py`. The log should show
+`virtual Xbox 360 controller created (uinput: /dev/input/eventN)`.
 
-## 6. Dicas de latência
+To check: open <https://hardwaretester.com/gamepad> in the PC's browser, or run
+`.venv/bin/python -m evdev.evtest` and choose "Microsoft X-Box 360 pad".
 
-- Prefira Wi-Fi **5 GHz** e o PC ligado no roteador por cabo, se possível.
-- Desative o modo de economia de bateria do celular.
-- Mantenha a página em primeiro plano (o app solta todos os botões ao ir para
-  segundo plano, por segurança).
-- Latência típica numa rede boa: 5–20 ms de ida e volta.
+## 6. Latency tips
 
-## 7. Solução de problemas
+- Prefer **5 GHz** Wi-Fi and, if possible, the PC connected to the router by cable.
+- Turn off the phone's battery saver mode.
+- Keep the page in the foreground (the app releases all buttons when it goes to the
+  background, for safety).
+- Typical latency on a good network: 5–20 ms round trip.
+- With the PC screen on, lower the resolution/quality in the panel if the video lags.
 
-| Problema | Solução |
-|----------|---------|
-| `Não foi possível criar o controle virtual` | ViGEmBus não instalado ou PC não reiniciado após instalar. |
-| Celular não abre a página | Firewall bloqueando; rede marcada como Pública; ou o roteador tem "isolamento de clientes/AP isolation" (desative ou use outra rede). |
-| IP errado no QR (VPN, várias placas de rede) | Rode `ipconfig` e use o IPv4 do adaptador Wi-Fi/Ethernet manualmente. |
-| `address already in use` | Outra coisa usa a porta: `python server/server.py --port 8090`. |
-| Status fica em "Reconectando…" | Servidor fechado ou celular mudou de rede; o app reconecta sozinho quando voltar. |
-| Botão "preso" | Impossível pela lógica (desconexão/segundo plano soltam tudo), mas tocar e soltar o botão corrige. |
-| Quero testar sem Windows | `python server/server.py --dry-run` (funciona em Linux/macOS, sem `vgamepad`). |
+## 7. Troubleshooting
 
-## Protocolo (para quem quiser estender)
+| Problem | Fix |
+|---------|-----|
+| `Could not create the virtual controller` | ViGEmBus not installed, or the PC was not restarted after installing it. |
+| Phone can't open the page | Firewall blocking (the panel shows the command for your current network); network marked as Public; or the router has "client isolation/AP isolation" on (turn it off or use another network). |
+| Phone says "Enter the controller PIN" | Tap the message and type the PIN shown in the terminal/panel, or scan the QR code again. |
+| Wrong IP in the QR code (VPN, several network cards) | Run `ipconfig` and use the IPv4 of the Wi-Fi/Ethernet adapter manually. |
+| `address already in use` | Something else is using the port: `python server/server.py --port 8090`. |
+| Status stays on "Reconnecting…" | Server closed or the phone changed network; the app reconnects by itself when it's back. |
+| "Stuck" button | Impossible by design (disconnecting/backgrounding releases everything), but tapping and releasing the button fixes it. |
+| Want to test without Windows | `python server/server.py --dry-run` (works on Linux/macOS, without `vgamepad`). |
 
-Mensagens JSON texto pelo WebSocket `/ws`:
+## Protocol (for anyone who wants to extend it)
 
-| Mensagem                            | Significado                              |
-|-------------------------------------|------------------------------------------|
-| `{"b":"A","s":1}` / `{"b":"A","s":0}` | Botão pressionado / solto (`A B X Y LB RB LT RT START BACK UP DOWN LEFT RIGHT L3 R3`) |
-| `{"a":"L","x":0.75,"y":-0.2}`       | Analógico `L` ou `R`, valores de -1 a 1 (y positivo = para baixo na tela) |
-| `{"r":1}`                           | Soltar tudo                              |
-| `{"p":123.4,"rtt":12}`              | Ping; o servidor devolve a mesma mensagem e guarda o `rtt` para o painel |
+JSON text messages over the `/ws` WebSocket:
 
-Conexão: `/ws?cid=<id do celular>&dev=<aparelho>`. O servidor responde
-`{"t":"hello","slot":N,"name":"..."}` e depois pode mandar
-`{"t":"slot","slot":N}` (movido) ou `{"t":"name","name":"..."}`.
-Códigos de fechamento: `4000` aberto em outra aba, `4001` acesso desligado,
-`4002` sala cheia, `4003` removido pelo painel, `4004` PIN ausente/errado (o PIN vai em
-`/ws?pin=...`), `4005` aparelho bloqueado por PINs errados.
+| Message | Meaning |
+|---------|---------|
+| `{"b":"A","s":1}` / `{"b":"A","s":0}` | Button pressed / released (`A B X Y LB RB LT RT START BACK UP DOWN LEFT RIGHT L3 R3`) |
+| `{"a":"L","x":0.75,"y":-0.2}` | Analog stick `L` or `R`, values from -1 to 1 (positive y = down on screen) |
+| `{"r":1}` | Release everything |
+| `{"p":123.4,"rtt":12}` | Ping; the server echoes the same message and keeps the `rtt` for the panel |
 
-Do servidor para o celular também vêm `{"t":"rumble","v":0.75,"ms":500}`
-(vibração do jogo; `ms` nulo = até chegar `v:0`) e `{"t":"find","slot":N}`
-(achar controle). O `hello` traz `"https"` com o link seguro, se houver.
+Connection: `/ws?cid=<phone id>&dev=<device>&pin=<PIN>`. The server answers
+`{"t":"hello","slot":N,"name":"..."}` and may later send `{"t":"slot","slot":N}` (moved)
+or `{"t":"name","name":"..."}`. Close codes: `4000` opened in another tab, `4001` access
+off, `4002` room full, `4003` removed from the panel, `4004` PIN missing/wrong, `4005`
+device locked after too many wrong PINs.
 
-Otimizações: botões são enviados só quando mudam; o analógico é agrupado em no
-máximo um pacote por quadro (`requestAnimationFrame`) com o valor mais recente,
-e é segurado se o buffer do socket passar de 1 KB, evitando fila acumulada.
+The server also sends `{"t":"rumble","v":0.75,"ms":500}` (game rumble; null `ms` = until
+`v:0` arrives) and `{"t":"find","slot":N}` (find controller). The `hello` carries
+`"https"` with the secure link, if any, and `"screen"` (screen stream on). With the
+stream on, `/screen?cid=...` delivers one JPEG frame per binary message; the phone
+replies `"a"` for every frame received (the server sends at most 2 unacknowledged
+frames, to avoid building up delay).
 
-## Licença
+Optimizations: buttons are only sent when they change; the analog stick is grouped into
+at most one packet per frame (`requestAnimationFrame`) with the latest value, and is held
+back if the socket buffer exceeds 1 KB, avoiding a growing queue.
 
-MIT, veja [LICENSE](LICENSE).
+## License
+
+MIT, see [LICENSE](LICENSE).

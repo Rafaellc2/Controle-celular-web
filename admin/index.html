@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Controle Web</title>
+  <title data-i18n="a.title">Web Controller</title>
   <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
@@ -11,75 +11,75 @@
     <div class="brand">
       <span class="logo">🎮</span>
       <div>
-        <h1>Controle Web</h1>
-        <p id="summary" class="muted">Conectando ao servidor…</p>
+        <h1 data-i18n="a.title">Web Controller</h1>
+        <p id="summary" class="muted" data-i18n="a.connecting">Connecting to the server…</p>
       </div>
     </div>
     <div class="top-actions">
-      <label class="switch" title="Permitir que celulares se conectem">
+      <label class="switch" title="Allow phones to connect" data-i18n-title="a.access.title">
         <input id="enabled" type="checkbox">
         <span class="track"><span class="thumb"></span></span>
-        <span id="enabled-label" class="switch-label">Acesso</span>
+        <span id="enabled-label" class="switch-label">Access</span>
       </label>
-      <label class="switch" title="Mostrar a tela deste PC no fundo do controle dos celulares">
+      <label class="switch" title="Show this PC's screen behind the phones' controller" data-i18n-title="a.screen.title">
         <input id="screen" type="checkbox">
         <span class="track"><span class="thumb"></span></span>
-        <span id="screen-label" class="switch-label">Tela do PC</span>
+        <span id="screen-label" class="switch-label" data-i18n="a.screen.label">PC screen</span>
       </label>
-      <div id="pin-box" class="pin-box hidden" title="Digite no celular, ou escaneie o QR Code (já leva o PIN)">
+      <div id="pin-box" class="pin-box hidden" title="Type it on the phone, or scan the QR code (it already carries the PIN)" data-i18n-title="a.pin.title">
         <span class="muted">PIN</span> <code id="pin">------</code>
-        <button id="new-pin" class="btn small" title="Gera outro PIN e desconecta os celulares">Novo PIN</button>
+        <button id="new-pin" class="btn small" title="Generates another PIN and disconnects the phones" data-i18n-title="a.pin.new.title" data-i18n="a.pin.new">New PIN</button>
       </div>
-      <button id="shutdown" class="btn danger-ghost">Encerrar servidor</button>
+      <button id="shutdown" class="btn danger-ghost" data-i18n="a.shutdown">Shut down server</button>
     </div>
   </header>
 
   <main>
-    <div id="offline" class="banner bad hidden">
-      Servidor encerrado ou sem resposta. Abra <b>Controle Web</b> pelo menu de apps (Super + Space) para ligar de novo.
+    <div id="offline" class="banner bad hidden" data-i18n-html="a.offline">
+      Server stopped or not responding. Open <b>Web Controller</b> from your app launcher to start it again.
     </div>
     <div id="alert-firewall" class="banner warn hidden">
-      <div>
-        <b>Firewall bloqueando a porta <span class="port"></span> nesta rede (<span class="lan-ip"></span>).</b>
-        Os celulares não vão conseguir abrir o link. Rode no terminal:
+      <div data-i18n-html="a.fw">
+        <b>The firewall is blocking port <span class="port"></span> on this network (<span class="lan-ip"></span>).</b>
+        Phones won't be able to open the link. Run in a terminal:
       </div>
-      <div class="cmd"><code id="firewall-cmd"></code><button class="btn small" data-copy="firewall-cmd">Copiar</button></div>
+      <div class="cmd"><code id="firewall-cmd"></code><button class="btn small" data-copy="firewall-cmd" data-i18n="a.copy">Copy</button></div>
     </div>
     <div id="alert-backend" class="banner warn hidden">
-      <div>
-        <b>Controles em modo de teste:</b> as entradas aparecem aqui, mas não chegam aos jogos.
+      <div data-i18n-html="a.backend">
+        <b>Controllers in test mode:</b> inputs show up here but don't reach games.
         <span id="backend-error" class="muted"></span>
       </div>
       <div id="backend-fix-linux" class="cmd hidden">
         <code id="uinput-cmd">sudo setfacl -m u:$USER:rw /dev/uinput</code>
-        <button class="btn small" data-copy="uinput-cmd">Copiar</button>
+        <button class="btn small" data-copy="uinput-cmd" data-i18n="a.copy">Copy</button>
       </div>
-      <div id="backend-fix-windows" class="hidden">Instale o driver ViGEmBus (veja o README) e reinicie o PC.</div>
-      <button id="retry-backend" class="btn small">Tentar de novo</button>
+      <div id="backend-fix-windows" class="hidden" data-i18n="a.backend.win">Install the ViGEmBus driver (see the README) and restart the PC.</div>
+      <button id="retry-backend" class="btn small" data-i18n="a.retry">Try again</button>
     </div>
 
     <section class="card invite">
-      <div id="qr" class="qr" aria-label="QR Code do link"></div>
+      <div id="qr" class="qr" aria-label="Link QR code"></div>
       <div class="invite-body">
-        <h2>Convide os jogadores</h2>
-        <p class="muted">Na mesma rede Wi-Fi, abram este link (ou escaneiem o QR Code) e virem o celular na horizontal.</p>
+        <h2 data-i18n="a.invite.h">Invite players</h2>
+        <p class="muted" data-i18n="a.invite.p">On the same Wi-Fi network, open this link (or scan the QR code) and turn the phone to landscape.</p>
         <div id="link-tabs" class="tabs">
-          <button class="tab" data-link="fixed">Link fixo</button>
-          <button class="tab" data-link="ip">Pelo IP</button>
-          <button class="tab" data-link="https">Com giroscópio</button>
+          <button class="tab" data-link="fixed" data-i18n="a.tab.fixed">Fixed link</button>
+          <button class="tab" data-link="ip" data-i18n="a.tab.ip">By IP</button>
+          <button class="tab" data-link="https" data-i18n="a.tab.https">With gyroscope</button>
         </div>
         <p id="link-help" class="muted small-text"></p>
         <div class="link-row">
           <code id="url" class="url">—</code>
-          <button class="btn" data-copy="url">Copiar link</button>
+          <button class="btn" data-copy="url" data-i18n="a.copylink">Copy link</button>
         </div>
         <p id="access-note" class="note"></p>
       </div>
     </section>
 
     <section class="screen-cfg" id="screen-cfg">
-      <h2>Tela do PC no celular</h2>
-      <label>Resolução
+      <h2 data-i18n="a.cfg.h">PC screen on the phone</h2>
+      <label><span data-i18n="a.cfg.res">Resolution</span>
         <select id="screen-width">
           <option value="854">480p</option>
           <option value="1280">720p</option>
@@ -95,25 +95,25 @@
           <option value="90">90</option>
         </select>
       </label>
-      <label>Qualidade (bitrate)
+      <label><span data-i18n="a.cfg.quality">Quality (bitrate)</span>
         <select id="screen-quality">
-          <option value="10">Baixa · ~25 Mbps (720p 60 fps)</option>
-          <option value="6">Média · ~40 Mbps</option>
-          <option value="4">Alta · ~55 Mbps</option>
-          <option value="2">Máxima · 75+ Mbps, só Wi-Fi 5 GHz bom</option>
+          <option value="10" data-i18n="a.q.low">Low · ~25 Mbps (720p 60 fps)</option>
+          <option value="6" data-i18n="a.q.mid">Medium · ~40 Mbps</option>
+          <option value="4" data-i18n="a.q.high">High · ~55 Mbps</option>
+          <option value="2" data-i18n="a.q.max">Maximum · 75+ Mbps, good 5 GHz Wi-Fi only</option>
         </select>
       </label>
-      <p id="screen-cfg-note" class="muted small-text">Mais resolução, FPS e qualidade pedem Wi-Fi 5 GHz e mais CPU/GPU do PC. A mudança vale na hora.</p>
+      <p id="screen-cfg-note" class="muted small-text" data-i18n="a.cfg.note">More resolution, FPS and quality need 5 GHz Wi-Fi and more CPU/GPU on the PC. Changes apply immediately.</p>
     </section>
 
     <section class="players-head">
-      <h2>Controles</h2>
+      <h2 data-i18n="a.players.h">Controllers</h2>
       <label class="max">
-        Jogadores
+        <span data-i18n="a.players.max">Players</span>
         <select id="max-players"></select>
       </label>
     </section>
-    <p id="max-hint" class="muted small-text hidden">O Windows reconhece no máximo 4 controles XInput.</p>
+    <p id="max-hint" class="muted small-text hidden" data-i18n="a.maxhint">Windows recognizes at most 4 XInput controllers.</p>
     <section id="slots" class="slots"></section>
 
     <template id="slot-template">
@@ -123,28 +123,29 @@
           <span class="pill"></span>
         </header>
         <div class="empty">
-          <p>Livre</p>
-          <p class="muted">Aguardando um celular…</p>
+          <p data-i18n="a.free">Free</p>
+          <p class="muted" data-i18n="a.waiting">Waiting for a phone…</p>
         </div>
         <div class="filled">
-          <input class="player-name" maxlength="24" placeholder="✎ Dar nome ao jogador" spellcheck="false" title="Clique para dar um nome">
+          <input class="player-name" maxlength="24" placeholder="✎ Name this player" data-i18n-placeholder="a.name.ph" spellcheck="false" title="Click to set a name" data-i18n-title="a.name.title">
           <p class="meta muted"></p>
           <div class="live">
-            <div class="mini-stick left" title="Analógico esquerdo"><span class="mini-dot"></span></div>
-            <div class="mini-stick right" title="Analógico direito"><span class="mini-dot"></span></div>
-            <div class="held"><span class="idle muted">Nenhum botão</span></div>
+            <div class="mini-stick left" title="Left stick" data-i18n-title="a.lstick"><span class="mini-dot"></span></div>
+            <div class="mini-stick right" title="Right stick" data-i18n-title="a.rstick"><span class="mini-dot"></span></div>
+            <div class="held"><span class="idle muted" data-i18n="a.nobtn">No buttons</span></div>
           </div>
-          <span class="rumble">📳 Vibrando</span>
+          <span class="rumble" data-i18n="a.rumble">📳 Rumbling</span>
           <div class="slot-actions">
-            <select class="move" title="Trocar de número com outro controle"></select>
-            <button class="btn small find" title="Faz o celular vibrar e piscar">Achar</button>
-            <button class="btn small danger-ghost kick" title="Desconecta e libera o número">Remover</button>
+            <select class="move" title="Swap numbers with another controller" data-i18n-title="a.move.title"></select>
+            <button class="btn small find" title="Makes the phone vibrate and flash" data-i18n-title="a.find.title" data-i18n="a.find">Find</button>
+            <button class="btn small danger-ghost kick" title="Disconnects and frees the number" data-i18n-title="a.kick.title" data-i18n="a.kick">Remove</button>
           </div>
         </div>
       </article>
     </template>
   </main>
 
+  <script src="/i18n.js"></script>
   <script src="/admin/admin.js"></script>
 </body>
 </html>

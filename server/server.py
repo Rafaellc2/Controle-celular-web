@@ -1,14 +1,14 @@
-"""Servidor do Controle Web.
+"""Web Controller server.
 
-- Celulares (rede local): app do controle em / e WebSocket em /ws.
-  Cada celular recebe um slot próprio (JOYSTICK-1, JOYSTICK-2, ...).
-- Painel (somente neste computador): http://localhost:PORTA/admin
-  liga/desliga o acesso, mostra o link/QR e os controles conectados.
-- Link fixo na rede: http://controle.local:PORTA (mDNS), não muda com o IP.
-- HTTPS opcional (certificado próprio) na porta --https-port, necessário
-  para o giroscópio do celular.
+- Phones (local network): controller app at / and WebSocket at /ws.
+  Each phone gets its own slot (JOYSTICK-1, JOYSTICK-2, ...).
+- Panel (this computer only): http://localhost:PORT/admin
+  turns access on/off, shows the link/QR code and the connected controllers.
+- Fixed network link: http://controle.local:PORT (mDNS), does not change with the IP.
+- Optional HTTPS (self-signed certificate) on --https-port, required for the
+  phone's gyroscope.
 
-Uso:
+Usage:
     python server/server.py [--port 8080] [--https-port 8443] [--name controle]
                             [--max-players 4] [--no-pin] [--dry-run] [--verbose]
 """
@@ -63,7 +63,7 @@ def new_pin():
         PIN_FILE.touch(mode=0o600)
         PIN_FILE.write_text(pin)
     except OSError as exc:
-        log.warning("Não foi possível salvar o PIN: %s", exc)
+        log.warning("Could not save the PIN: %s", exc)
     return pin
 
 
@@ -91,7 +91,7 @@ def check_pin(app, ip, given):
         return None
     count += 1
     fails[ip] = (0, time.monotonic() + PIN_LOCK_SECONDS) if count >= PIN_MAX_FAILS else (count, 0.0)
-    log.warning("PIN errado vindo de %s (%d/%d)", ip, count, PIN_MAX_FAILS)
+    log.warning("Wrong PIN from %s (%d/%d)", ip, count, PIN_MAX_FAILS)
     return CLOSE_LOCKED if count >= PIN_MAX_FAILS else CLOSE_BAD_PIN
 
 
@@ -114,7 +114,7 @@ def save_screen_config(screen):
         CERT_DIR.mkdir(parents=True, exist_ok=True)
         SCREEN_CONFIG.write_text(json.dumps({"width": screen.width, "fps": screen.fps, "quality": screen.quality}))
     except OSError as exc:
-        log.warning("Não foi possível salvar a qualidade da tela: %s", exc)
+        log.warning("Could not save the screen quality: %s", exc)
 
 
 def local_ip():
@@ -198,7 +198,7 @@ def is_local_request(request):
 def local_only(handler):
     async def wrapper(request):
         if not is_local_request(request):
-            raise web.HTTPForbidden(text="Painel disponível apenas em http://localhost neste computador.")
+            raise web.HTTPForbidden(text="The panel is only available at http://localhost on this computer.")
         return await handler(request)
 
     return wrapper
@@ -327,7 +327,7 @@ async def ws_admin(request):
                 cmd = json.loads(msg.data)
                 await run_admin_command(request.app, cmd)
             except (ValueError, TypeError, KeyError) as exc:
-                log.warning("Comando inválido do painel: %s (%s)", msg.data[:200], exc)
+                log.warning("Invalid panel command: %s (%s)", msg.data[:200], exc)
     finally:
         hub.admins.discard(ws)
     return ws
@@ -352,7 +352,7 @@ async def run_admin_command(app, cmd):
         if app[PIN]["value"] is not None:
             app[PIN]["value"] = new_pin()
             app[PIN]["fails"].clear()
-            log.info("Novo PIN gerado; celulares conectados precisam entrar de novo.")
+            log.info("New PIN generated; connected phones must join again.")
             await asyncio.gather(*(hub._drop(p, CLOSE_BAD_PIN) for p in list(hub.players.values())))
             refresh_extra(app)
     elif action == "screen":
@@ -364,7 +364,7 @@ async def run_admin_command(app, cmd):
     elif action == "retry_backend":
         hub.retry_backend()
     elif action == "shutdown":
-        log.info("Encerrando pelo painel.")
+        log.info("Shutting down from the panel.")
         # Deixa a resposta sair antes de desligar.
         asyncio.get_running_loop().call_later(0.2, app[STOP].set)
 
@@ -372,7 +372,7 @@ async def run_admin_command(app, cmd):
 async def set_screen_enabled(app, enabled):
     hub, screen = app[HUB], app[SCREEN]
     screen.enabled = enabled
-    log.info("Transmissão da tela %s", "LIGADA" if enabled else "DESLIGADA")
+    log.info("Screen streaming %s", "ON" if enabled else "OFF")
     if not enabled:
         await screen.stop()
     for p in hub.players.values():
@@ -397,7 +397,7 @@ def ensure_cert(ip, names):
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.x509.oid import NameOID
     except ImportError:
-        log.warning("Pacote 'cryptography' ausente: HTTPS (giroscópio) desligado.")
+        log.warning("Package 'cryptography' missing: HTTPS (gyroscope) is off.")
         return None
 
     cert_file, key_file = CERT_DIR / "cert.pem", CERT_DIR / "key.pem"
@@ -431,7 +431,7 @@ def ensure_cert(ip, names):
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
     os.chmod(key_file, 0o600)
     cert_file.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    log.info("Certificado HTTPS gerado em %s", CERT_DIR)
+    log.info("HTTPS certificate generated in %s", CERT_DIR)
     return cert_file, key_file
 
 
@@ -452,7 +452,7 @@ async def start_mdns(app):
         from zeroconf import ServiceInfo
         from zeroconf.asyncio import AsyncZeroconf
     except ImportError:
-        log.warning("Pacote 'zeroconf' ausente: link fixo %s.local desligado.", net["name"])
+        log.warning("Package 'zeroconf' missing: fixed link %s.local is off.", net["name"])
         return
     ip = local_ip()
     info = ServiceInfo(
@@ -466,10 +466,10 @@ async def start_mdns(app):
         zc = AsyncZeroconf()
         await zc.async_register_service(info, allow_name_change=True)
     except Exception as exc:
-        log.warning("Não foi possível anunciar %s.local: %s", net["name"], exc)
+        log.warning("Could not announce %s.local: %s", net["name"], exc)
         return
     net.update(zc=zc, info=info, mdns_ip=ip)
-    log.info("Link fixo: http://%s.local:%d", net["name"], app[PORT])
+    log.info("Fixed link: http://%s.local:%d", net["name"], app[PORT])
 
 
 async def update_mdns(app):
@@ -480,7 +480,7 @@ async def update_mdns(app):
     net["info"].addresses = [socket.inet_aton(ip)]
     net["mdns_ip"] = ip
     await net["zc"].async_update_service(net["info"])
-    log.info("IP mudou: %s.local agora aponta para %s", net["name"], ip)
+    log.info("IP changed: %s.local now points to %s", net["name"], ip)
 
 
 async def stop_mdns(app):
@@ -522,7 +522,7 @@ async def housekeeping_extra(app):
     try:
         await update_mdns(app)
     except Exception as exc:
-        log.warning("Falha ao atualizar mDNS: %s", exc)
+        log.warning("Failed to update mDNS: %s", exc)
 
 
 async def on_startup(app):
@@ -561,7 +561,7 @@ async def run_server(app, host, port, https_port, ssl_ctx):
             try:
                 await web.TCPSite(runner, host, https_port, ssl_context=ssl_ctx).start()
             except OSError as exc:
-                log.warning("HTTPS na porta %d indisponível: %s", https_port, exc)
+                log.warning("HTTPS on port %d unavailable: %s", https_port, exc)
                 app[NET]["https_port"] = None
                 refresh_extra(app)
         await app[STOP].wait()
@@ -570,21 +570,21 @@ async def run_server(app, host, port, https_port, ssl_ctx):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Controle Web: celulares como gamepads Xbox 360")
+    parser = argparse.ArgumentParser(description="Web Controller: phones as Xbox 360 gamepads")
     parser.add_argument("--port", type=int, default=int(os.environ.get("CONTROLE_WEB_PORT", "8080")))
     parser.add_argument("--https-port", type=int, default=int(os.environ.get("CONTROLE_WEB_HTTPS_PORT", "8443")),
-                        help="porta HTTPS para o giroscópio (0 desliga)")
+                        help="HTTPS port for the gyroscope (0 turns it off)")
     parser.add_argument("--name", default=os.environ.get("CONTROLE_WEB_NAME", "controle"),
-                        help="nome na rede: http://NOME.local")
+                        help="network name: http://NAME.local")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--max-players", type=int, default=4)
-    parser.add_argument("--screen-width", type=int, help="largura da imagem enviada ao celular (padrão 1920; o painel também ajusta)")
-    parser.add_argument("--screen-fps", type=int, help="quadros por segundo da transmissão (padrão 60)")
-    parser.add_argument("--screen-quality", type=int, help="qualidade JPEG: 2 (melhor) a 31 (pior) (padrão 6)")
-    parser.add_argument("--screen-monitor", default=None, help="monitor a transmitir (ex.: eDP-1); padrão: o primeiro")
-    parser.add_argument("--no-pin", action="store_true", help="não pede PIN (só em rede de confiança)")
-    parser.add_argument("--dry-run", action="store_true", help="não cria controles virtuais, só loga")
-    parser.add_argument("--verbose", action="store_true", help="loga também o movimento dos analógicos")
+    parser.add_argument("--screen-width", type=int, help="width of the image sent to the phone (default 1920; the panel also adjusts it)")
+    parser.add_argument("--screen-fps", type=int, help="frames per second of the stream (default 60)")
+    parser.add_argument("--screen-quality", type=int, help="JPEG quality: 2 (best) to 31 (worst) (default 6)")
+    parser.add_argument("--screen-monitor", default=None, help="monitor to stream (e.g. eDP-1); default: the first one")
+    parser.add_argument("--no-pin", action="store_true", help="do not ask for a PIN (trusted networks only)")
+    parser.add_argument("--dry-run", action="store_true", help="do not create virtual controllers, only log")
+    parser.add_argument("--verbose", action="store_true", help="also log analog stick movement")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -626,13 +626,13 @@ def main():
     url = f"http://{ip}:{args.port}"
     print()
     print("=" * 60)
-    print("  Controle Web rodando!")
-    print(f"  Celulares (mesma Wi-Fi): {url}")
-    print(f"  Link fixo:               http://{args.name}.local:{args.port}")
+    print("  Web Controller is running!")
+    print(f"  Phones (same Wi-Fi):     {url}")
+    print(f"  Fixed link:              http://{args.name}.local:{args.port}")
     if ssl_ctx:
-        print(f"  Com giroscópio (HTTPS):  https://{ip}:{args.https_port}")
-    print(f"  Painel (este PC):        http://localhost:{args.port}/admin")
-    print(f"  PIN do celular:          {app[PIN]['value'] or 'desligado (--no-pin)'}")
+        print(f"  With gyroscope (HTTPS):  https://{ip}:{args.https_port}")
+    print(f"  Panel (this PC):         http://localhost:{args.port}/admin")
+    print(f"  Phone PIN:               {app[PIN]['value'] or 'off (--no-pin)'}")
     print("=" * 60)
     print_qr(with_pin(url, app))
     try:

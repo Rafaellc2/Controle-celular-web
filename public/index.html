@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -50,24 +50,24 @@
 
   <!-- Topo: status + menu -->
   <div id="topbar" class="topbar">
-    <div id="status" class="status off"><span id="slot" class="slot">J?</span><span class="dot"></span><span id="status-text">Conectando…</span></div>
-    <div class="menu-btn" data-action="menu" title="Ajustes">☰</div>
+    <div id="status" class="status off"><span id="slot" class="slot">J?</span><span class="dot"></span><span id="status-text">Connecting…</span></div>
+    <div class="menu-btn" data-action="menu" title="Settings" data-i18n-title="menu.settings">☰</div>
   </div>
 
   <!-- Barra do modo de edição -->
   <div id="editbar" class="editbar bottom hidden">
-    <div class="edit-title" id="edit-title">Toque num botão para editar</div>
+    <div class="edit-title" id="edit-title" data-i18n="edit.hint">Tap a button to edit</div>
     <div class="edit-row">
       <div class="ebtn" data-action="size-down">−</div>
       <div class="ebtn" data-action="size-up">+</div>
-      <div class="ebtn" data-action="opacity-down" title="Mais transparente">◐ −</div>
-      <div class="ebtn" data-action="opacity-up" title="Mais opaco">◐ +</div>
-      <div class="ebtn" id="toggle-ghost" data-action="toggle-ghost" title="Some da tela mas continua funcionando">Invisível</div>
-      <div class="ebtn" id="toggle-hide" data-action="toggle-hide" title="Remove o botão (não funciona mais)">Desativar</div>
-      <div class="ebtn" data-action="bar-move" title="Mover esta barra">⇅</div>
-      <div class="ebtn" data-action="reset">Padrão</div>
-      <div class="ebtn" data-action="cancel">Cancelar</div>
-      <div class="ebtn primary" data-action="save">Salvar</div>
+      <div class="ebtn" data-action="opacity-down" title="More transparent" data-i18n-title="edit.opac.down">◐ −</div>
+      <div class="ebtn" data-action="opacity-up" title="More opaque" data-i18n-title="edit.opac.up">◐ +</div>
+      <div class="ebtn" id="toggle-ghost" data-action="toggle-ghost" title="Hidden on screen but still works" data-i18n-title="edit.ghost.title" data-i18n="edit.ghost">Invisible</div>
+      <div class="ebtn" id="toggle-hide" data-action="toggle-hide" title="Removes the button (it stops working)" data-i18n-title="edit.disable.title" data-i18n="edit.disable">Disable</div>
+      <div class="ebtn" data-action="bar-move" title="Move this bar" data-i18n-title="edit.move">⇅</div>
+      <div class="ebtn" data-action="reset" data-i18n="edit.reset">Default</div>
+      <div class="ebtn" data-action="cancel" data-i18n="edit.cancel">Cancel</div>
+      <div class="ebtn primary" data-action="save" data-i18n="edit.save">Save</div>
     </div>
   </div>
 
@@ -75,70 +75,70 @@
   <div id="menu" class="overlay sheet-backdrop hidden" data-action="menu-close">
     <div class="sheet" data-action="noop">
       <div class="sheet-head">
-        <h2>Ajustes</h2>
-        <div class="mini-btn" data-action="menu-close">✕ Fechar</div>
+        <h2 data-i18n="menu.settings">Settings</h2>
+        <div class="mini-btn" data-action="menu-close" data-i18n="menu.close">✕ Close</div>
       </div>
       <div class="sheet-cols">
         <section class="sheet-col">
-          <div class="sheet-label">Perfil do HUD</div>
+          <div class="sheet-label" data-i18n="menu.profile">HUD profile</div>
           <div id="profiles" class="chips"></div>
           <div class="row">
-            <div class="mini-btn" data-action="profile-new">+ Novo</div>
-            <div class="mini-btn" data-action="profile-rename">Renomear</div>
-            <div class="mini-btn danger" id="profile-delete" data-action="profile-delete">Excluir</div>
+            <div class="mini-btn" data-action="profile-new" data-i18n="menu.new">+ New</div>
+            <div class="mini-btn" data-action="profile-rename" data-i18n="menu.rename">Rename</div>
+            <div class="mini-btn danger" id="profile-delete" data-action="profile-delete" data-i18n="menu.delete">Delete</div>
           </div>
-          <div class="sheet-btn" data-action="edit">✎ Editar HUD</div>
+          <div class="sheet-btn" data-action="edit" data-i18n="menu.edit">✎ Edit HUD</div>
           <div class="toggle" data-action="floating">
-            <span>Analógico flutuante<small>aparece onde o dedo encostar (lado esquerdo)</small></span>
+            <span><span data-i18n="menu.floating">Floating stick</span><small data-i18n="menu.floating.sub">appears where your finger lands (left side)</small></span>
             <span class="tg" id="tg-floating"></span>
           </div>
-          <div class="sheet-btn" data-action="fullscreen">⛶ Tela cheia</div>
+          <div class="sheet-btn" data-action="fullscreen" data-i18n="menu.fullscreen">⛶ Fullscreen</div>
           <div class="toggle" data-action="screen">
-            <span>Tela do PC no fundo<small>transmite a tela do computador (liga no painel do PC)</small></span>
+            <span><span data-i18n="menu.screen">PC screen as background</span><small data-i18n="menu.screen.sub">streams your computer's screen (turn it on in the PC panel)</small></span>
             <span class="tg" id="tg-screen"></span>
           </div>
           <p id="screen-note" class="sheet-note"></p>
         </section>
 
         <section class="sheet-col">
-          <div class="sheet-label">Vibração ao apertar</div>
+          <div class="sheet-label" data-i18n="vib.title">Vibration on press</div>
           <div class="segmented" id="vibra">
-            <div class="seg" data-action="vibra:0">Desligada</div>
-            <div class="seg" data-action="vibra:1">Fraca</div>
-            <div class="seg" data-action="vibra:2">Média</div>
-            <div class="seg" data-action="vibra:3">Forte</div>
+            <div class="seg" data-action="vibra:0" data-i18n="vib.off">Off</div>
+            <div class="seg" data-action="vibra:1" data-i18n="vib.low">Low</div>
+            <div class="seg" data-action="vibra:2" data-i18n="vib.mid">Medium</div>
+            <div class="seg" data-action="vibra:3" data-i18n="vib.high">Strong</div>
           </div>
           <div class="toggle" data-action="game-vibra">
-            <span>Vibração do jogo<small>o celular vibra quando o jogo manda</small></span>
+            <span><span data-i18n="vib.game">Game vibration</span><small data-i18n="vib.game.sub">the phone vibrates when the game rumbles</small></span>
             <span class="tg" id="tg-game-vibra"></span>
           </div>
-          <div class="row"><div class="mini-btn" data-action="vibra-test">📳 Testar vibração</div></div>
+          <div class="row"><div class="mini-btn" data-action="vibra-test" data-i18n="vib.test">📳 Test vibration</div></div>
           <p id="vibra-note" class="sheet-note"></p>
 
-          <div class="sheet-label">Giroscópio (analógico esquerdo)</div>
+          <div class="sheet-label" data-i18n="gyro.title">Gyroscope (left stick)</div>
           <div class="segmented" id="gyro">
-            <div class="seg" data-action="gyro:off">Desligado</div>
-            <div class="seg" data-action="gyro:steer">Volante</div>
-            <div class="seg" data-action="gyro:tilt">Inclinar</div>
+            <div class="seg" data-action="gyro:off" data-i18n="gyro.off">Off</div>
+            <div class="seg" data-action="gyro:steer" data-i18n="gyro.steer">Steering</div>
+            <div class="seg" data-action="gyro:tilt" data-i18n="gyro.tilt">Tilt</div>
           </div>
           <div class="row">
-            <div class="toggle compact" data-action="gyro-invert"><span>Inverter</span><span class="tg" id="tg-gyro-invert"></span></div>
-            <div class="mini-btn" data-action="gyro-center">◎ Centralizar</div>
+            <div class="toggle compact" data-action="gyro-invert"><span data-i18n="gyro.invert">Invert</span><span class="tg" id="tg-gyro-invert"></span></div>
+            <div class="mini-btn" data-action="gyro-center" data-i18n="gyro.center">◎ Center</div>
           </div>
           <div class="stepper">
-            <span>Girar para o máximo<small>quanto menor, mais sensível</small></span>
+            <span><span data-i18n="gyro.range">Turn for full range</span><small data-i18n="gyro.range.sub">lower = more sensitive</small></span>
             <div class="mini-btn" data-action="gyro-range:-2">−</div>
             <b id="gyro-range-val">28°</b>
             <div class="mini-btn" data-action="gyro-range:2">+</div>
           </div>
           <div class="stepper">
-            <span>Zona morta<small>giro ignorado no centro</small></span>
+            <span><span data-i18n="gyro.dead">Dead zone</span><small data-i18n="gyro.dead.sub">rotation ignored near the center</small></span>
             <div class="mini-btn" data-action="gyro-dead:-1">−</div>
             <b id="gyro-dead-val">2°</b>
             <div class="mini-btn" data-action="gyro-dead:1">+</div>
           </div>
           <p id="gyro-note" class="sheet-note"></p>
-          <div id="gyro-https" class="sheet-btn hidden" data-action="open-https">🔒 Abrir link seguro</div>
+          <div id="gyro-https" class="sheet-btn hidden" data-action="open-https" data-i18n="gyro.https">🔒 Open secure link</div>
         </section>
       </div>
     </div>
@@ -147,12 +147,12 @@
   <!-- "Achar controle" disparado pelo painel do PC -->
   <div id="find" class="overlay find hidden">
     <div id="find-label" class="find-label">JOYSTICK-1</div>
-    <p>Este é o seu controle</p>
+    <p data-i18n="find.sub">This is your controller</p>
   </div>
 
   <div id="rotate" class="overlay rotate">
     <div class="rotate-icon">⟳</div>
-    <p>Gire o celular para a horizontal</p>
+    <p data-i18n="rotate">Rotate your phone to landscape</p>
   </div>
 
   <div id="notice" class="overlay hidden" data-action="reconnect">
@@ -163,6 +163,7 @@
   <!-- iPhone (Safari 18+): alternar este switch gera uma vibração curta -->
   <label id="haptic" class="haptic" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
 
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -35,11 +35,10 @@
     A: { x: 83, y: 72, s: 1 },
   };
   const ITEM_NAMES = {
-    LT: "L2", LB: "L1", RB: "R1", RT: "R2", DPAD: "Direcional",
-    STICK: "Analógico esquerdo", RSTICK: "Analógico direito",
+    LT: "L2", LB: "L1", RB: "R1", RT: "R2",
     BACK: "SELECT", START: "START", L3: "L3", R3: "R3",
-    Y: "△ Triângulo", X: "□ Quadrado", B: "○ Círculo", A: "✕ Xis",
   };
+  const itemName = (id) => ITEM_NAMES[id] || t(`item.${id}`);
   const SCALE_MIN = 0.4;
   const SCALE_MAX = 2.2;
   const OPACITY_MIN = 0.1;
@@ -155,7 +154,8 @@
       // Primeira vez (ou vindo da versão com um layout só)
       let old = null;
       try { old = JSON.parse(load(OLD_LAYOUT_KEY) || "null"); } catch { old = null; }
-      data = { active: "Padrão", list: { "Padrão": newProfile(old) } };
+      const first = t("profile.default");
+      data = { active: first, list: { [first]: newProfile(old) } };
     }
     for (const [name, p] of Object.entries(data.list)) {
       data.list[name] = {
@@ -242,16 +242,14 @@
     if (!canVibrate) {
       if (IS_IOS) {
         hapticEl.click();
-        note.textContent = "iPhone: o Safari não tem vibração para sites. Tentei o truque do iOS 18; se não sentiu, não há como vibrar.";
+        note.textContent = t("vib.note.ios");
       } else {
-        note.textContent = "Este navegador não tem vibração para sites. Use o Chrome ou o Samsung Internet.";
+        note.textContent = t("vib.note.none");
       }
       return;
     }
     const ok = navigator.vibrate([80, 60, 80]);
-    note.textContent = ok
-      ? "Pedido de vibração aceito pelo navegador. Se não sentiu, o celular está bloqueando: desative o modo silencioso/Não perturbe e ligue \"Vibração ao tocar\" (Configurações → Sons e vibração)."
-      : "O navegador recusou a vibração. Toque em qualquer lugar da tela uma vez e teste de novo.";
+    note.textContent = ok ? t("vib.note.ok") : t("vib.note.refused");
   }
 
   // ---------- WebSocket ----------
@@ -390,7 +388,7 @@
     const query = `cid=${encodeURIComponent(CID)}&dev=${encodeURIComponent(DEVICE)}&pin=${encodeURIComponent(load(PIN_KEY) || "")}`;
     const sock = new WebSocket(`${proto}//${location.host}/ws?${query}`);
     ws = sock;
-    setStatus("off", "Conectando…");
+    setStatus("off", t("status.connecting"));
 
     sock.onopen = () => {
       lastPong = performance.now();
@@ -415,7 +413,7 @@
         syncScreen();
         setSlot(data.slot);
         hideNotice();
-        setStatus("on", playerName || "Conectado");
+        setStatus("on", playerName || t("status.connected"));
         sendSnapshot();
       } else if (data.t === "slot") {
         setSlot(data.slot);
@@ -441,14 +439,14 @@
       syncScreen();
       playRumble(0);
       setSlot(null);
-      setStatus("off", "Desconectado");
+      setStatus("off", t("status.disconnected"));
 
       if (ev.code === 4000 || ev.code === 4003) {
         // Não reconecta sozinho: evita duas abas brigando ou voltar depois de removido.
         stopped = true;
         releaseAll();
-        if (ev.code === 4000) showNotice("Este controle foi aberto em outra aba ou janela.", "Toque para usar aqui");
-        else showNotice("Você foi removido pelo anfitrião.", "Toque para entrar de novo");
+        if (ev.code === 4000) showNotice(t("notice.replaced"), t("notice.replaced.hint"));
+        else showNotice(t("notice.kicked"), t("notice.kicked.hint"));
         return;
       }
       if (ev.code === 4004 || ev.code === 4005) {
@@ -458,20 +456,20 @@
         releaseAll();
         if (needPin) {
           save(PIN_KEY, "");
-          showNotice("Digite o PIN do controle.", "Toque aqui (o PIN aparece no painel do PC)");
+          showNotice(t("notice.pin"), t("notice.pin.hint"));
         } else {
-          showNotice("Muitas tentativas com PIN errado.", "Aguarde alguns minutos e toque para tentar de novo");
+          showNotice(t("notice.locked"), t("notice.locked.hint"));
         }
         return;
       }
       if (ev.code === 4001 || ev.code === 4002) {
         releaseAll();
-        if (ev.code === 4001) showNotice("O anfitrião desligou o acesso aos controles.", "Aguardando liberar…");
-        else showNotice("Todos os controles estão em uso.", "Aguardando uma vaga…");
+        if (ev.code === 4001) showNotice(t("notice.disabled"), t("notice.disabled.hint"));
+        else showNotice(t("notice.full"), t("notice.full.hint"));
         reconnectTimer = setTimeout(connect, RETRY_BLOCKED);
         return;
       }
-      setStatus("off", "Reconectando…");
+      setStatus("off", t("status.reconnecting"));
       reconnectTimer = setTimeout(connect, reconnectDelay);
       reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX);
     };
@@ -799,10 +797,11 @@
   function updateEditbar() {
     const it = selected && draft ? draft[selected] : null;
     $("#edit-title").textContent = it
-      ? `${ITEM_NAMES[selected]} · tamanho ${Math.round(it.s * 100)}% · opacidade ${Math.round((it.o ?? 1) * 100)}%${it.inv ? " · invisível (funciona)" : ""}${it.hidden ? " · desativado" : ""}`
-      : `${profiles.active}: arraste · pinça redimensiona · ◐ opacidade de todos · verde = visível, vermelho = invisível`;
-    $("#toggle-hide").textContent = it && it.hidden ? "Ativar" : "Desativar";
-    $("#toggle-ghost").textContent = it && it.inv ? "Visível" : "Invisível";
+      ? t("edit.title.item", { name: itemName(selected), size: Math.round(it.s * 100), op: Math.round((it.o ?? 1) * 100) })
+        + (it.inv ? t("edit.title.inv") : "") + (it.hidden ? t("edit.title.off") : "")
+      : t("edit.title.none", { profile: profiles.active });
+    $("#toggle-hide").textContent = t(it && it.hidden ? "edit.enable" : "edit.disable");
+    $("#toggle-ghost").textContent = t(it && it.inv ? "edit.visible" : "edit.ghost");
   }
 
   function setScale(id, s) {
@@ -906,13 +905,13 @@
     const del = $("#profile-delete");
     del.classList.toggle("disabled", Object.keys(profiles.list).length < 2);
     del.classList.toggle("confirm", deleteArmed);
-    del.textContent = deleteArmed ? "Toque de novo" : "Excluir";
+    del.textContent = t(deleteArmed ? "menu.delete.confirm" : "menu.delete");
 
     $("#tg-floating").classList.toggle("on", p.floating);
     $("#tg-game-vibra").classList.toggle("on", gameVibra);
     $("#tg-screen").classList.toggle("on", screenWanted);
     $("#screen-note").textContent = screenWanted && !screenAllowed
-      ? "A transmissão está desligada no painel do PC (ou o PC não consegue capturar a tela)." : "";
+      ? t("menu.screen.note") : "";
     $("#tg-gyro-invert").classList.toggle("on", p.gyroInvert);
     $("#gyro-range-val").textContent = `${p.gyroRange}°`;
     $("#gyro-dead-val").textContent = `${p.gyroDead}°`;
@@ -925,8 +924,8 @@
     });
 
     let vnote = "";
-    if (!canVibrate && IS_IOS) vnote = "No iPhone a vibração tem força fixa e precisa do iOS 18 ou mais novo.";
-    else if (!canVibrate) vnote = "Este navegador não permite vibração.";
+    if (!canVibrate && IS_IOS) vnote = t("vib.note.ios.fixed");
+    else if (!canVibrate) vnote = t("vib.note.unsupported");
     $("#vibra-note").textContent = vnote;
 
     // Giroscópio só funciona em HTTPS
@@ -934,12 +933,12 @@
     const needHttps = p.gyro !== "off" && !window.isSecureContext;
     if (needHttps) {
       gnote = httpsUrl
-        ? "O giroscópio só funciona pelo link seguro (HTTPS). Seus perfis deste link não vão junto: crie de novo lá."
-        : "O giroscópio precisa do link seguro (HTTPS), que está desligado no servidor.";
+        ? t("gyro.note.https")
+        : t("gyro.note.nohttps");
     } else if (p.gyro !== "off" && !gyroListening) {
-      gnote = "Sem acesso ao sensor de movimento. No iPhone, permita o acesso quando o Safari perguntar.";
+      gnote = t("gyro.note.nosensor");
     } else if (p.gyro !== "off") {
-      gnote = "Segure o celular na posição de jogo e toque em Centralizar.";
+      gnote = t("gyro.note.center");
     }
     $("#gyro-note").textContent = gnote;
     $("#gyro-https").classList.toggle("hidden", !(needHttps && httpsUrl));
@@ -1154,7 +1153,7 @@
         renderMenu();
         break;
       case "profile-new": {
-        const name = askName("Nome do novo perfil (ex.: Bomba Patch, Corrida):", uniqueName("Perfil"));
+        const name = askName(t("profile.new.prompt"), uniqueName(t("profile.base")));
         if (!name) break;
         // Novo perfil começa como cópia do atual
         const finalName = uniqueName(name);
@@ -1164,7 +1163,7 @@
         break;
       }
       case "profile-rename": {
-        const name = askName("Novo nome do perfil:", profiles.active);
+        const name = askName(t("profile.rename.prompt"), profiles.active);
         if (!name || name === profiles.active || profiles.list[name]) break;
         // Mantém a ordem dos perfis ao renomear
         const list = {};
@@ -1224,7 +1223,7 @@
 
       case "reconnect":
         if (needPin) {
-          const pin = (window.prompt("PIN do controle (aparece no painel do PC):", "") || "").replace(/\D/g, "");
+          const pin = (window.prompt(t("pin.prompt"), "") || "").replace(/\D/g, "");
           if (!pin) break;
           save(PIN_KEY, pin);
           needPin = false;

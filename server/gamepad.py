@@ -81,7 +81,7 @@ class VirtualGamepad(BaseGamepad):
         self._vg = vg
         self.pad = vg.VX360Gamepad()
         self._buttons = {k: getattr(vg.XUSB_BUTTON, v) for k, v in BUTTON_NAMES.items()}
-        log.info("JOYSTICK-%d: controle Xbox 360 virtual criado (ViGEmBus).", slot)
+        log.info("JOYSTICK-%d: virtual Xbox 360 controller created (ViGEmBus).", slot)
 
     def _button(self, name, pressed):
         if pressed:
@@ -176,7 +176,7 @@ class LinuxGamepad(BaseGamepad):
         self._gain = 1.0
         self._rumble_cb = None
         self._loop = None
-        log.info("JOYSTICK-%d: controle Xbox 360 virtual criado (uinput: %s).", slot, self.dev.device.path)
+        log.info("JOYSTICK-%d: virtual Xbox 360 controller created (uinput: %s).", slot, self.dev.device.path)
 
     def _button(self, name, pressed):
         if name in self.DPAD:
@@ -275,16 +275,16 @@ class DummyGamepad(BaseGamepad):
         self.tag = f"J{slot}"
 
     def _button(self, name, pressed):
-        log.info("%s botão %-5s %s", self.tag, name, "DOWN" if pressed else "up")
+        log.info("%s button  %-5s %s", self.tag, name, "DOWN" if pressed else "up")
 
     def _trigger(self, name, pressed):
-        log.info("%s gatilho %-3s %s", self.tag, name, "DOWN" if pressed else "up")
+        log.info("%s trigger %-3s %s", self.tag, name, "DOWN" if pressed else "up")
 
     def _stick(self, stick, x, y):
         log.debug("%s stick %s x=%+.2f y=%+.2f", self.tag, stick, x, y)
 
     def _reset(self):
-        log.info("%s reset (tudo solto)", self.tag)
+        log.info("%s reset (all released)", self.tag)
 
     def _update(self):
         pass

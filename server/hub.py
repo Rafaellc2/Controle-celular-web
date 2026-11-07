@@ -87,8 +87,8 @@ class Hub:
             try:
                 self.pads[n] = self._new_pad(n, self.dry_run)
             except Exception as exc:
-                log.error("Não foi possível criar o controle virtual: %s", exc)
-                log.error("Caindo para dry-run (veja o painel / README.md).")
+                log.error("Could not create the virtual controller: %s", exc)
+                log.error("Falling back to dry-run (see the panel / README.md).")
                 self.backend_error = str(exc)
                 self.dry_run = True
                 self.backend = "dry-run"
@@ -101,7 +101,7 @@ class Hub:
         try:
             pad.attach_rumble(asyncio.get_running_loop(), lambda v, ms: self._rumble(slot, v, ms))
         except Exception as exc:  # vibração é extra: o controle funciona sem ela
-            log.warning("JOYSTICK-%d sem vibração do jogo: %s", slot, exc)
+            log.warning("JOYSTICK-%d has no game rumble: %s", slot, exc)
         return pad
 
     def _rumble(self, slot, strength, ms):
@@ -143,7 +143,7 @@ class Hub:
         self.backend_error = None
         for slot in sorted(self.players):
             self.pad(slot)
-        log.info("Backend %s ativo.", self.backend)
+        log.info("Backend %s active.", self.backend)
         self.changed()
 
     def close_pads(self):
@@ -179,7 +179,7 @@ class Hub:
         player.connected_at = time.time()
         player.disconnected_at = None
         self._release(player)
-        log.info("JOYSTICK-%d conectado: %s (%s)", player.slot, player.device, player.ip)
+        log.info("JOYSTICK-%d connected: %s (%s)", player.slot, player.device, player.ip)
 
     def leave(self, player, ws):
         if player.ws is not ws:
@@ -188,7 +188,7 @@ class Hub:
         player.disconnected_at = time.time()
         if self.players.get(player.slot) is player:
             self._release(player)
-        log.info("JOYSTICK-%d desconectado", player.slot)
+        log.info("JOYSTICK-%d disconnected", player.slot)
         self.changed()
 
     def handle_input(self, player, msg):
@@ -235,7 +235,7 @@ class Hub:
     # ---------- Comandos do painel ----------
     async def set_enabled(self, enabled):
         self.enabled = bool(enabled)
-        log.info("Acesso %s", "LIGADO" if self.enabled else "DESLIGADO")
+        log.info("Access %s", "ON" if self.enabled else "OFF")
         if not self.enabled:
             await asyncio.gather(*(self._drop(p, CLOSE_DISABLED) for p in list(self.players.values())))
         self.changed()
@@ -249,7 +249,7 @@ class Hub:
     async def kick(self, slot):
         player = self.players.get(slot)
         if player:
-            log.info("JOYSTICK-%d removido pelo painel", slot)
+            log.info("JOYSTICK-%d removed from the panel", slot)
             await self._drop(player, CLOSE_KICKED)
 
     async def move(self, slot, to):
@@ -269,7 +269,7 @@ class Hub:
         for p in (a, b):
             if p and p.online:
                 await p.ws.send_json({"t": "slot", "slot": p.slot})
-        log.info("JOYSTICK-%d movido para JOYSTICK-%d", slot, to)
+        log.info("JOYSTICK-%d moved to JOYSTICK-%d", slot, to)
         self.changed()
 
     async def find(self, slot):
@@ -335,7 +335,7 @@ class Hub:
             now = time.time()
             for p in list(self.players.values()):
                 if not p.online and p.disconnected_at and now - p.disconnected_at > RESERVE_SECONDS:
-                    log.info("Reserva do JOYSTICK-%d expirou", p.slot)
+                    log.info("JOYSTICK-%d reservation expired", p.slot)
                     del self.players[p.slot]
             refresh_extra()
             self.changed()  # atualiza contadores (tempo de reserva, ping)

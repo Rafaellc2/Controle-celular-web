@@ -185,7 +185,7 @@ class Screen:
         try:
             ff = await self._spawn()
         except Exception as exc:
-            self.error = f"Não foi possível iniciar a captura: {exc}"
+            self.error = f"Could not start the capture: {exc}"
             log.error(self.error)
             return False
 
@@ -209,8 +209,8 @@ class Screen:
 
         err = (await ff.stderr.read()).decode(errors="replace").strip().splitlines()
         if not got_frame:
-            self.error = err[-1] if err else "A captura terminou sem enviar imagem."
-            log.error("Captura de tela falhou: %s", self.error)
+            self.error = err[-1] if err else "The capture ended without sending any image."
+            log.error("Screen capture failed: %s", self.error)
         return got_frame
 
     def _ffmpeg_out(self):
@@ -249,7 +249,7 @@ class Screen:
                 *base, "-f", "x11grab", "-framerate", str(self.fps), "-i", os.environ["DISPLAY"],
                 *self._ffmpeg_out(), stdin=asyncio.subprocess.DEVNULL, **pipe)
         self._procs.append(ff)
-        log.info("Transmissão da tela iniciada (%s, %d px, %d fps)", kind, self.width, self.fps)
+        log.info("Screen streaming started (%s, %d px, %d fps)", kind, self.width, self.fps)
         return ff
 
     def _pick_monitor(self):
@@ -264,7 +264,7 @@ class Screen:
             except ValueError:
                 continue
         if not monitors:
-            raise RuntimeError("gpu-screen-recorder não encontrou nenhum monitor")
+            raise RuntimeError("gpu-screen-recorder found no monitor")
         name = self.monitor if self.monitor in monitors else next(iter(monitors))
         return name, monitors[name]
 

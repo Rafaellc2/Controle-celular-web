@@ -22,11 +22,6 @@
   let cards = [];
   let shownQrUrl = null;
   let linkKind = localStorage.getItem("controle-admin-link") || "fixed";
-  const LINK_HELP = {
-    fixed: "Não muda quando o IP do PC muda, e o layout salvo no celular continua. Funciona no iPhone e no Android 12 ou mais novo.",
-    ip: "Funciona em qualquer celular, mas muda se o IP do PC mudar.",
-    https: "Necessário para o giroscópio. Na primeira vez o celular avisa que o certificado não é confiável: toque em Avançado → Continuar.",
-  };
 
   // ---------- Conexão com o servidor ----------
   function connect() {
@@ -41,7 +36,7 @@
       if (ws !== sock) return;
       ws = null;
       $("#offline").classList.remove("hidden");
-      $("#summary").textContent = "Servidor desligado";
+      $("#summary").textContent = t("a.server.off");
       setTimeout(connect, 2000);
     };
   }
@@ -56,7 +51,7 @@
 
     const total = s.slots.length;
     const online = s.online;
-    $("#summary").textContent = `${online} de ${total} ${total === 1 ? "controle conectado" : "controles conectados"} · porta ${s.port}`;
+    $("#summary").textContent = t(total === 1 ? "a.summary.one" : "a.summary.many", { n: online, total, port: s.port });
 
     enabledEl.checked = s.enabled;
     $("#pin-box").classList.toggle("hidden", !s.pin);
@@ -69,15 +64,13 @@
     $("#screen-cfg").classList.toggle("hidden", sc.available === false);
     screenEl.checked = Boolean(sc.enabled);
     screenEl.disabled = sc.available === false;
-    $("#screen-label").textContent = sc.available === false ? "Tela do PC indisponível (falta ffmpeg/gpu-screen-recorder)"
-      : !sc.enabled ? "Tela do PC desligada"
-      : sc.error ? `Tela do PC: ${sc.error}`
-      : `Tela do PC ligada · ${sc.viewers} assistindo`;
-    $("#enabled-label").textContent = s.enabled ? "Acesso ligado" : "Acesso desligado";
+    $("#screen-label").textContent = sc.available === false ? t("a.screen.unavailable")
+      : !sc.enabled ? t("a.screen.off")
+      : sc.error ? t("a.screen.err", { err: sc.error })
+      : t("a.screen.on", { n: sc.viewers });
+    $("#enabled-label").textContent = t(s.enabled ? "a.access.on" : "a.access.off");
     const note = $("#access-note");
-    note.textContent = s.enabled
-      ? "Acesso ligado: novos celulares entram no primeiro JOYSTICK livre."
-      : "Acesso desligado: ninguém consegue entrar. Quem estava esperando entra sozinho quando você ligar.";
+    note.textContent = t(s.enabled ? "a.access.note.on" : "a.access.note.off");
     note.classList.toggle("off", !s.enabled);
 
     const links = s.links || { ip: s.url };
@@ -86,7 +79,7 @@
       tab.classList.toggle("hidden", !links[tab.dataset.link]);
       tab.classList.toggle("on", tab.dataset.link === linkKind);
     });
-    $("#link-help").textContent = LINK_HELP[linkKind];
+    $("#link-help").textContent = t(`a.help.${linkKind}`);
     $("#url").textContent = links[linkKind];
     if (shownQrUrl !== links[linkKind]) {
       $("#qr").innerHTML = (s.qrs && s.qrs[linkKind]) || "";
@@ -127,7 +120,7 @@
       el.querySelector(".slot-name").textContent = `JOYSTICK-${n}`;
 
       const move = el.querySelector(".move");
-      move.add(new Option("Mover para…", ""));
+      move.add(new Option(t("a.move.opt"), ""));
       for (let m = 1; m <= total; m++) {
         if (m !== n) move.add(new Option(`JOYSTICK-${m}`, String(m)));
       }
@@ -158,17 +151,17 @@
     const pill = el.querySelector(".pill");
     if (!p) {
       pill.className = "pill";
-      pill.textContent = "Livre";
+      pill.textContent = t("a.free");
       el.classList.remove("is-active");
       return;
     }
 
     if (p.online) {
       pill.className = "pill online";
-      pill.textContent = p.rtt != null ? `Online · ${p.rtt} ms` : "Online";
+      pill.textContent = p.rtt != null ? t("a.online.ms", { rtt: p.rtt }) : t("a.online");
     } else {
       pill.className = "pill away";
-      pill.textContent = `Caiu · guarda ${p.reserve_left ?? 0}s`;
+      pill.textContent = t("a.away", { s: p.reserve_left ?? 0 });
     }
     el.classList.toggle("is-active", p.online && p.held.length > 0);
 
@@ -176,7 +169,7 @@
     if (document.activeElement !== input) input.value = p.name;
 
 
-    el.querySelector(".meta").textContent = `${p.device || "Celular"} · ${p.ip} · ${p.online ? "conectado há " + since(p.since) : "reconectando…"}`;
+    el.querySelector(".meta").textContent = `${p.device || t("a.device")} · ${p.ip} · ${p.online ? t("a.connected", { t: since(p.since) }) : t("a.reconnecting")}`;
 
     const [x, y] = p.stick;
     el.querySelector(".mini-stick .mini-dot").style.transform = `translate(${x * 17}px, ${y * 17}px)`;
@@ -188,7 +181,7 @@
     const key = p.held.join(",");
     if (held.dataset.key !== key) {
       held.dataset.key = key;
-      held.innerHTML = p.held.length ? "" : '<span class="idle muted">Nenhum botão</span>';
+      held.innerHTML = p.held.length ? "" : `<span class="idle muted">${t("a.nobtn")}</span>`;
       for (const b of p.held) {
         const chip = document.createElement("span");
         chip.className = "chip";
@@ -226,7 +219,7 @@
     }));
   }
   $("#new-pin").addEventListener("click", () => {
-    if (confirm("Gerar um novo PIN? Os celulares conectados serão desconectados.")) command({ cmd: "new_pin" });
+    if (confirm(t("a.pin.confirm"))) command({ cmd: "new_pin" });
   });
   maxEl.addEventListener("change", () => command({ cmd: "max_players", value: Number(maxEl.value) }));
   $("#retry-backend").addEventListener("click", () => command({ cmd: "retry_backend" }));
@@ -240,11 +233,11 @@
       return;
     }
     shutdownBtn.classList.add("confirm");
-    shutdownBtn.textContent = "Clique de novo para encerrar";
+    shutdownBtn.textContent = t("a.shutdown.confirm");
     clearTimeout(shutdownTimer);
     shutdownTimer = setTimeout(() => {
       shutdownBtn.classList.remove("confirm");
-      shutdownBtn.textContent = "Encerrar servidor";
+      shutdownBtn.textContent = t("a.shutdown");
     }, 3000);
   });
 
@@ -254,7 +247,7 @@
       try {
         await navigator.clipboard.writeText(text);
         const old = btn.textContent;
-        btn.textContent = "Copiado!";
+        btn.textContent = t("a.copied");
         setTimeout(() => { btn.textContent = old; }, 1200);
       } catch { /* sem permissão: o texto continua selecionável */ }
     });
