@@ -330,6 +330,7 @@
     sock.binaryType = "arraybuffer";
     screenWs = sock;
     sock.onmessage = (ev) => {
+      sock.send("a"); // confirma o quadro: o PC só manda o próximo com vaga na janela
       pendingFrame = ev.data;
       if (!decoding) drawFrames();
     };

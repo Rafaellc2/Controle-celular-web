@@ -45,7 +45,7 @@ SCREEN = web.AppKey("screen", Screen)
 
 CERT_DIR = Path.home() / ".controle-web"
 SCREEN_CONFIG = CERT_DIR / "screen.json"
-SCREEN_DEFAULTS = {"width": 1280, "fps": 60, "quality": 6}
+SCREEN_DEFAULTS = {"width": 1920, "fps": 60, "quality": 6}
 
 
 def load_screen_config():
@@ -230,16 +230,23 @@ async def ws_screen(request):
     await ws.prepare(request)
     viewer = screen.add()
 
+    sock = request.transport.get_extra_info("socket")
+    if sock is not None:
+        try:  # buffer pequeno no kernel: fila grande de quadros na rede vira atraso
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 262144)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except OSError:
+            pass
+
     async def pump():
         while True:
-            await viewer.event.wait()
-            viewer.event.clear()
-            await ws.send_bytes(viewer.frame)  # espera a rede: quadros que chegam enquanto isso são descartados
+            await ws.send_bytes(await viewer.next_frame())
 
     sender = asyncio.create_task(pump())
     try:
-        async for _ in ws:
-            pass
+        async for msg in ws:
+            if msg.type == WSMsgType.TEXT and msg.data == "a":
+                viewer.ack()
     finally:
         sender.cancel()
         screen.remove(viewer)
@@ -505,7 +512,7 @@ def main():
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--max-players", type=int, default=4)
     parser.add_argument("--screen", action="store_true", help="já começa com a transmissão da tela do PC ligada")
-    parser.add_argument("--screen-width", type=int, help="largura da imagem enviada ao celular (padrão 1280; o painel também ajusta)")
+    parser.add_argument("--screen-width", type=int, help="largura da imagem enviada ao celular (padrão 1920; o painel também ajusta)")
     parser.add_argument("--screen-fps", type=int, help="quadros por segundo da transmissão (padrão 60)")
     parser.add_argument("--screen-quality", type=int, help="qualidade JPEG: 2 (melhor) a 31 (pior) (padrão 6)")
     parser.add_argument("--screen-monitor", default=None, help="monitor a transmitir (ex.: eDP-1); padrão: o primeiro")

@@ -16,6 +16,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 
 log = logging.getLogger("screen")
 
@@ -27,20 +28,51 @@ def _alive(proc):
     return proc.poll() is None if isinstance(proc, subprocess.Popen) else proc.returncode is None
 
 
+WINDOW = 2          # quadros enviados e ainda sem confirmação do celular
+ACK_TIMEOUT = 1.0   # confirmação perdida: libera a janela depois disso
+
+
 class Viewer:
-    """Um celular assistindo. Guarda só o quadro mais recente: se a rede atrasar, pula quadros."""
+    """Um celular assistindo.
+
+    Guarda só o quadro mais recente e manda no máximo WINDOW quadros por vez: o
+    celular confirma cada um que recebe. Se o Wi-Fi não der conta, o FPS cai em vez
+    de o atraso crescer (fila no buffer da rede)."""
 
     def __init__(self):
         self.frame = None
+        self.sent = None
+        self.inflight = 0
+        self.sent_at = 0.0
         self.event = asyncio.Event()
 
     def push(self, frame):
         self.frame = frame
         self.event.set()
 
+    def ack(self):
+        self.inflight = max(0, self.inflight - 1)
+        self.event.set()
+
+    async def next_frame(self):
+        """Espera um quadro novo e vaga na janela."""
+        while True:
+            await self.event.wait()
+            self.event.clear()
+            if self.frame is None or self.frame is self.sent:
+                continue
+            if self.inflight >= WINDOW and time.monotonic() - self.sent_at < ACK_TIMEOUT:
+                continue  # o próximo ack acorda de novo
+            if self.inflight >= WINDOW:
+                self.inflight = 0
+            self.sent = self.frame
+            self.inflight += 1
+            self.sent_at = time.monotonic()
+            return self.frame
+
 
 class Screen:
-    def __init__(self, width=1280, fps=60, quality=6, monitor=None, on_change=None):
+    def __init__(self, width=1920, fps=60, quality=6, monitor=None, on_change=None):
         self.width = width
         self.fps = fps
         self.quality = quality  # -q:v do MJPEG: 2 (melhor) a 31 (pior)
