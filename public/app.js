@@ -45,6 +45,7 @@
   const OPACITY_MIN = 0.1;
   const OPACITY_STEP = 0.1;
   const SCREEN_KEY = "controle-tela-pc";
+  const PIN_KEY = "controle-pin";
   const SCREEN_RETRY = 1000;
   const PROFILES_KEY = "controle-perfis-v1";
   const OLD_LAYOUT_KEY = "controle-hud-v1"; // versão antiga: um layout só
@@ -315,6 +316,14 @@
     findTimer = setTimeout(() => findEl.classList.add("hidden"), 2600);
   }
 
+  // PIN vindo do QR Code (?pin=123456): guarda e tira da barra de endereço.
+  const urlPin = new URLSearchParams(location.search).get("pin");
+  if (urlPin) {
+    save(PIN_KEY, urlPin.replace(/\D/g, ""));
+    history.replaceState(null, "", location.pathname);
+  }
+  let needPin = false;
+
   // ---------- Tela do PC ----------
   const screenEl = $("#screen");
   const screenCtx = screenEl.getContext("2d", { alpha: false });
@@ -378,7 +387,7 @@
     if (stopped || (ws && ws.readyState <= WebSocket.OPEN)) return;
 
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const query = `cid=${encodeURIComponent(CID)}&dev=${encodeURIComponent(DEVICE)}`;
+    const query = `cid=${encodeURIComponent(CID)}&dev=${encodeURIComponent(DEVICE)}&pin=${encodeURIComponent(load(PIN_KEY) || "")}`;
     const sock = new WebSocket(`${proto}//${location.host}/ws?${query}`);
     ws = sock;
     setStatus("off", "Conectando…");
@@ -440,6 +449,19 @@
         releaseAll();
         if (ev.code === 4000) showNotice("Este controle foi aberto em outra aba ou janela.", "Toque para usar aqui");
         else showNotice("Você foi removido pelo anfitrião.", "Toque para entrar de novo");
+        return;
+      }
+      if (ev.code === 4004 || ev.code === 4005) {
+        // PIN errado/ausente ou aparelho bloqueado: não adianta tentar de novo sozinho.
+        stopped = true;
+        needPin = ev.code === 4004;
+        releaseAll();
+        if (needPin) {
+          save(PIN_KEY, "");
+          showNotice("Digite o PIN do controle.", "Toque aqui (o PIN aparece no painel do PC)");
+        } else {
+          showNotice("Muitas tentativas com PIN errado.", "Aguarde alguns minutos e toque para tentar de novo");
+        }
         return;
       }
       if (ev.code === 4001 || ev.code === 4002) {
@@ -1201,6 +1223,12 @@
         break;
 
       case "reconnect":
+        if (needPin) {
+          const pin = (window.prompt("PIN do controle (aparece no painel do PC):", "") || "").replace(/\D/g, "");
+          if (!pin) break;
+          save(PIN_KEY, pin);
+          needPin = false;
+        }
         stopped = false;
         hideNotice();
         connect();

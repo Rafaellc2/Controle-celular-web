@@ -10,25 +10,28 @@
 
 Uso:
     python server/server.py [--port 8080] [--https-port 8443] [--name controle]
-                            [--max-players 4] [--dry-run] [--verbose]
+                            [--max-players 4] [--no-pin] [--dry-run] [--verbose]
 """
 
 import argparse
 import asyncio
+import hmac
 import ipaddress
 import json
 import logging
 import os
 import re
+import secrets
 import socket
 import ssl
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
 from aiohttp import WSMsgType, web
 
-from hub import Hub
+from hub import CLOSE_BAD_PIN, CLOSE_LOCKED, Hub
 from screen import Screen
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -42,10 +45,60 @@ TASKS = web.AppKey("tasks", list)
 STOP = web.AppKey("stop", asyncio.Event)
 NET = web.AppKey("net", dict)  # nome mDNS, porta HTTPS, zeroconf
 SCREEN = web.AppKey("screen", Screen)
+PIN = web.AppKey("pin", dict)  # {"value": "123456" ou None se desligado, "fails": {ip: (erros, bloqueado_até)}}
 
 CERT_DIR = Path.home() / ".controle-web"
+PIN_FILE = CERT_DIR / "pin"
+PIN_MAX_FAILS = 5        # erros seguidos antes de bloquear o aparelho
+PIN_LOCK_SECONDS = 300
 SCREEN_CONFIG = CERT_DIR / "screen.json"
 SCREEN_DEFAULTS = {"width": 1920, "fps": 60, "quality": 6}
+
+
+def new_pin():
+    """PIN de 6 dígitos guardado em ~/.controle-web/pin (o celular não precisa digitar de novo a cada início)."""
+    pin = f"{secrets.randbelow(10**6):06d}"
+    try:
+        CERT_DIR.mkdir(parents=True, exist_ok=True)
+        PIN_FILE.touch(mode=0o600)
+        PIN_FILE.write_text(pin)
+    except OSError as exc:
+        log.warning("Não foi possível salvar o PIN: %s", exc)
+    return pin
+
+
+def load_pin():
+    try:
+        pin = PIN_FILE.read_text().strip()
+    except OSError:
+        pin = ""
+    return pin if re.fullmatch(r"\d{6}", pin) else new_pin()
+
+
+def check_pin(app, ip, given):
+    """None se o PIN confere (ou está desligado); senão o código de fechamento do WebSocket."""
+    pin = app[PIN]
+    if pin["value"] is None:
+        return None
+    fails = pin["fails"]
+    count, until = fails.get(ip, (0, 0.0))
+    if until > time.monotonic():
+        return CLOSE_LOCKED
+    if not given:
+        return CLOSE_BAD_PIN  # celular sem PIN guardado ainda: não conta como tentativa errada
+    if hmac.compare_digest(given.encode(), pin["value"].encode()):
+        fails.pop(ip, None)
+        return None
+    count += 1
+    fails[ip] = (0, time.monotonic() + PIN_LOCK_SECONDS) if count >= PIN_MAX_FAILS else (count, 0.0)
+    log.warning("PIN errado vindo de %s (%d/%d)", ip, count, PIN_MAX_FAILS)
+    return CLOSE_LOCKED if count >= PIN_MAX_FAILS else CLOSE_BAD_PIN
+
+
+def with_pin(url, app):
+    """Link com o PIN embutido (usado só no QR Code: escanear já entra)."""
+    pin = app[PIN]["value"]
+    return f"{url}/?pin={pin}" if pin else url
 
 
 def load_screen_config():
@@ -178,6 +231,11 @@ async def ws_player(request):
     ws = web.WebSocketResponse(heartbeat=5, max_msg_size=4096)
     await ws.prepare(request)
 
+    refused_pin = check_pin(request.app, request.remote, request.query.get("pin", "")[:16])
+    if refused_pin:
+        await ws.close(code=refused_pin)
+        return ws
+
     cid = request.query.get("cid", "")[:64] or f"anon-{id(ws)}"
     device = request.query.get("dev", "")[:40]
     player, refused = hub.join(cid, request.remote, device)
@@ -290,6 +348,13 @@ async def run_admin_command(app, cmd):
         await hub.rename(int(cmd["slot"]), cmd["name"])
     elif action == "find":
         await hub.find(int(cmd["slot"]))
+    elif action == "new_pin":
+        if app[PIN]["value"] is not None:
+            app[PIN]["value"] = new_pin()
+            app[PIN]["fails"].clear()
+            log.info("Novo PIN gerado; celulares conectados precisam entrar de novo.")
+            await asyncio.gather(*(hub._drop(p, CLOSE_BAD_PIN) for p in list(hub.players.values())))
+            refresh_extra(app)
     elif action == "screen":
         await set_screen_enabled(app, bool(cmd["value"]))
     elif action == "screen_config":
@@ -436,9 +501,11 @@ def refresh_extra(app):
         links["fixed"] = f"http://{net['name']}.local:{port}"
     if net.get("https_port"):
         links["https"] = f"https://{ip}:{net['https_port']}"
-    if hub.extra_state.get("links") != links:
+    pin = app[PIN]["value"]
+    if hub.extra_state.get("links") != links or hub.extra_state.get("pin") != pin:
         hub.extra_state["links"] = links
-        hub.extra_state["qrs"] = {k: qr_svg(v) for k, v in links.items()}
+        hub.extra_state["pin"] = pin
+        hub.extra_state["qrs"] = {k: qr_svg(with_pin(v, app)) for k, v in links.items()}
         hub.extra_state["url"] = links["ip"]
     ports = [port] + ([net["https_port"]] if net.get("https_port") else [])
     hub.extra_state["firewall"] = all(firewall_status(p, ip) is not False for p in ports) if firewall_status(port, ip) is not None else None
@@ -515,6 +582,7 @@ def main():
     parser.add_argument("--screen-fps", type=int, help="quadros por segundo da transmissão (padrão 60)")
     parser.add_argument("--screen-quality", type=int, help="qualidade JPEG: 2 (melhor) a 31 (pior) (padrão 6)")
     parser.add_argument("--screen-monitor", default=None, help="monitor a transmitir (ex.: eDP-1); padrão: o primeiro")
+    parser.add_argument("--no-pin", action="store_true", help="não pede PIN (só em rede de confiança)")
     parser.add_argument("--dry-run", action="store_true", help="não cria controles virtuais, só loga")
     parser.add_argument("--verbose", action="store_true", help="loga também o movimento dos analógicos")
     args = parser.parse_args()
@@ -534,6 +602,7 @@ def main():
     app = web.Application()
     app[HUB] = Hub(dry_run=args.dry_run, max_players=args.max_players)
     app[PORT] = args.port
+    app[PIN] = {"value": None if args.no_pin else load_pin(), "fails": {}}
     cfg = {**SCREEN_DEFAULTS, **load_screen_config()}
     cfg.update({k: v for k, v in (("width", args.screen_width), ("fps", args.screen_fps), ("quality", args.screen_quality)) if v})
     app[SCREEN] = Screen(width=cfg["width"], fps=cfg["fps"], quality=cfg["quality"],
@@ -563,8 +632,9 @@ def main():
     if ssl_ctx:
         print(f"  Com giroscópio (HTTPS):  https://{ip}:{args.https_port}")
     print(f"  Painel (este PC):        http://localhost:{args.port}/admin")
+    print(f"  PIN do celular:          {app[PIN]['value'] or 'desligado (--no-pin)'}")
     print("=" * 60)
-    print_qr(url)
+    print_qr(with_pin(url, app))
     try:
         asyncio.run(run_server(app, args.host, args.port, args.https_port, ssl_ctx))
     except (web.GracefulExit, KeyboardInterrupt):

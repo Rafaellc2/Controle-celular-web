@@ -59,7 +59,14 @@ pip install -r requirements.txt
 python server/server.py
 ```
 
-O terminal mostra o endereço (ex.: `http://192.168.0.15:8080`) e um **QR Code**.
+O terminal mostra o endereço (ex.: `http://192.168.0.15:8080`), o **PIN** de 6 dígitos e um
+**QR Code**. Escanear o QR já entra (ele leva o PIN); abrindo o link à mão, o celular pede o
+PIN uma vez. O PIN também aparece no painel, com o botão **Novo PIN**.
+
+> **Segurança:** use só em redes em que você confia. Sem o PIN, qualquer aparelho na mesma
+> Wi-Fi viraria um controle (e, com a Tela do PC ligada, veria a sua tela). O PIN trava o
+> aparelho por 5 minutos depois de 5 erros. O tráfego não é criptografado (HTTP), então não
+> use em Wi-Fi pública.
 
 Opções:
 
@@ -70,6 +77,7 @@ Opções:
 | `--name NOME` | Link fixo `http://NOME.local` (padrão `controle`)          |
 | `--max-players N` | Quantidade inicial de controles (padrão 4, máx. 8; muda no painel) |
 | `--screen-width N` / `--screen-fps N` / `--screen-quality N` / `--screen-monitor NOME` | Largura (1920), fps (60), qualidade JPEG 2–31 (6); o painel também ajusta e guarda em `~/.controle-web/screen.json` e monitor da transmissão |
+| `--no-pin`   | Não pede PIN (só em rede de confiança)                      |
 | `--dry-run`  | Não cria o controle virtual; só mostra as entradas no log   |
 | `--verbose`  | Loga também os movimentos do analógico                      |
 
@@ -282,7 +290,8 @@ Conexão: `/ws?cid=<id do celular>&dev=<aparelho>`. O servidor responde
 `{"t":"hello","slot":N,"name":"..."}` e depois pode mandar
 `{"t":"slot","slot":N}` (movido) ou `{"t":"name","name":"..."}`.
 Códigos de fechamento: `4000` aberto em outra aba, `4001` acesso desligado,
-`4002` sala cheia, `4003` removido pelo painel.
+`4002` sala cheia, `4003` removido pelo painel, `4004` PIN ausente/errado (o PIN vai em
+`/ws?pin=...`), `4005` aparelho bloqueado por PINs errados.
 
 Do servidor para o celular também vêm `{"t":"rumble","v":0.75,"ms":500}`
 (vibração do jogo; `ms` nulo = até chegar `v:0`) e `{"t":"find","slot":N}`
@@ -291,3 +300,7 @@ Do servidor para o celular também vêm `{"t":"rumble","v":0.75,"ms":500}`
 Otimizações: botões são enviados só quando mudam; o analógico é agrupado em no
 máximo um pacote por quadro (`requestAnimationFrame`) com o valor mais recente,
 e é segurado se o buffer do socket passar de 1 KB, evitando fila acumulada.
+
+## Licença
+
+MIT, veja [LICENSE](LICENSE).

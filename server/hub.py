@@ -20,6 +20,8 @@ CLOSE_REPLACED = 4000  # mesmo celular abriu o controle em outra aba
 CLOSE_DISABLED = 4001  # acesso desligado no painel
 CLOSE_FULL = 4002      # todos os slots ocupados
 CLOSE_KICKED = 4003    # removido pelo painel
+CLOSE_BAD_PIN = 4004   # PIN ausente ou errado
+CLOSE_LOCKED = 4005    # muitas tentativas de PIN erradas deste aparelho
 
 
 class Player:

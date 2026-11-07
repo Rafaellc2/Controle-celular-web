@@ -59,6 +59,8 @@
     $("#summary").textContent = `${online} de ${total} ${total === 1 ? "controle conectado" : "controles conectados"} · porta ${s.port}`;
 
     enabledEl.checked = s.enabled;
+    $("#pin-box").classList.toggle("hidden", !s.pin);
+    $("#pin").textContent = s.pin || "";
     const sc = s.screen || {};
     for (const [id, key] of [["screen-width", "width"], ["screen-fps", "fps"], ["screen-quality", "quality"]]) {
       const el = $("#" + id);
@@ -223,6 +225,9 @@
       quality: Number($("#screen-quality").value),
     }));
   }
+  $("#new-pin").addEventListener("click", () => {
+    if (confirm("Gerar um novo PIN? Os celulares conectados serão desconectados.")) command({ cmd: "new_pin" });
+  });
   maxEl.addEventListener("change", () => command({ cmd: "max_players", value: Number(maxEl.value) }));
   $("#retry-backend").addEventListener("click", () => command({ cmd: "retry_backend" }));
 
