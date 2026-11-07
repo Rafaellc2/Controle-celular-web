@@ -69,6 +69,8 @@ html, body {
   opacity: var(--o, 1);
 }
 .item.is-hidden { display: none; }
+/* Invisível: some da tela mas continua recebendo toque */
+.item.is-invisible { opacity: 0; }
 
 /* ---------- Botões genéricos ---------- */
 .btn {
@@ -243,9 +245,17 @@ body.editing #pad {
     linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
   background-size: 5% 10%;
 }
+/* Edição: verde = aparece na tela, vermelho = invisível (funciona), tracejado = desativado */
 body.editing .item {
-  outline: 0.4vmin dashed rgba(255, 255, 255, 0.25);
+  outline: 0.5vmin solid #4fd1a5;
   outline-offset: 0.8vmin;
+}
+body.editing .item.is-invisible {
+  opacity: 0.3;
+  outline-color: #ff6b6b;
+}
+body.editing .item.is-hidden {
+  outline: 0.4vmin dashed rgba(255, 255, 255, 0.25);
 }
 body.editing .item.is-hidden {
   display: block;

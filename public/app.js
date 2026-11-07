@@ -15,7 +15,8 @@
   // Cor de cada JOYSTICK-N (mesma ordem do painel)
   const SLOT_COLORS = ["#7fa8ff", "#ff6b6b", "#4fd1a5", "#e58cff", "#ffb547", "#5ad7e6", "#ff9a5a", "#b49cff"];
 
-  // Layout padrão do HUD: centro do item em % da tela (x, y), escala (s), opacidade (o, 1 = opaco) e se começa oculto
+  // Layout padrão do HUD: centro do item em % da tela (x, y), escala (s), opacidade (o, 1 = opaco),
+  // se começa desativado (hidden) e se é invisível mas funciona (inv)
   const DEFAULT_LAYOUT = {
     LT: { x: 10, y: 12, s: 1 },
     LB: { x: 27, y: 12, s: 1 },
@@ -132,6 +133,7 @@
       if (Number.isFinite(it.s)) layout[id].s = clamp(it.s, SCALE_MIN, SCALE_MAX);
       if (Number.isFinite(it.o)) layout[id].o = clamp(it.o, OPACITY_MIN, 1);
       if ("hidden" in it) layout[id].hidden = Boolean(it.hidden);
+      if ("inv" in it) layout[id].inv = Boolean(it.inv);
     }
     return layout;
   }
@@ -175,6 +177,7 @@
     el.style.setProperty("--s", it.s);
     el.style.setProperty("--o", it.o ?? 1);
     el.classList.toggle("is-hidden", Boolean(it.hidden));
+    el.classList.toggle("is-invisible", Boolean(it.inv));
   }
 
   function applyLayout(layout) {
@@ -766,9 +769,10 @@
   function updateEditbar() {
     const it = selected && draft ? draft[selected] : null;
     $("#edit-title").textContent = it
-      ? `${ITEM_NAMES[selected]} · tamanho ${Math.round(it.s * 100)}% · opacidade ${Math.round((it.o ?? 1) * 100)}%${it.hidden ? " · oculto" : ""}`
-      : `${profiles.active}: arraste para mover · pinça redimensiona · ◐ muda a opacidade de todos`;
-    $("#toggle-hide").textContent = it && it.hidden ? "Mostrar" : "Ocultar";
+      ? `${ITEM_NAMES[selected]} · tamanho ${Math.round(it.s * 100)}% · opacidade ${Math.round((it.o ?? 1) * 100)}%${it.inv ? " · invisível (funciona)" : ""}${it.hidden ? " · desativado" : ""}`
+      : `${profiles.active}: arraste · pinça redimensiona · ◐ opacidade de todos · verde = visível, vermelho = invisível`;
+    $("#toggle-hide").textContent = it && it.hidden ? "Ativar" : "Desativar";
+    $("#toggle-ghost").textContent = it && it.inv ? "Visível" : "Invisível";
   }
 
   function setScale(id, s) {
@@ -1064,6 +1068,13 @@
         break;
       case "opacity-down": changeOpacity(-OPACITY_STEP); break;
       case "opacity-up": changeOpacity(OPACITY_STEP); break;
+      case "toggle-ghost":
+        if (selected) {
+          draft[selected].inv = !draft[selected].inv;
+          applyItem(selected, draft[selected]);
+          updateEditbar();
+        }
+        break;
       case "toggle-hide":
         if (selected) {
           draft[selected].hidden = !draft[selected].hidden;

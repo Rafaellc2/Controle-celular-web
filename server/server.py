@@ -511,7 +511,6 @@ def main():
                         help="nome na rede: http://NOME.local")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--max-players", type=int, default=4)
-    parser.add_argument("--screen", action="store_true", help="já começa com a transmissão da tela do PC ligada")
     parser.add_argument("--screen-width", type=int, help="largura da imagem enviada ao celular (padrão 1920; o painel também ajusta)")
     parser.add_argument("--screen-fps", type=int, help="quadros por segundo da transmissão (padrão 60)")
     parser.add_argument("--screen-quality", type=int, help="qualidade JPEG: 2 (melhor) a 31 (pior) (padrão 6)")
@@ -539,7 +538,6 @@ def main():
     cfg.update({k: v for k, v in (("width", args.screen_width), ("fps", args.screen_fps), ("quality", args.screen_quality)) if v})
     app[SCREEN] = Screen(width=cfg["width"], fps=cfg["fps"], quality=cfg["quality"],
                          monitor=args.screen_monitor, on_change=lambda: sync_screen_state(app))
-    app[SCREEN].enabled = args.screen
     app[TASKS] = []
     app[STOP] = asyncio.Event()
     app[NET] = {"name": args.name, "https_port": args.https_port if ssl_ctx else None}

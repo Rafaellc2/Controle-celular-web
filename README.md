@@ -69,7 +69,6 @@ Opções:
 | `--https-port N` | Porta HTTPS para o giroscópio (padrão `8443`; `0` desliga) |
 | `--name NOME` | Link fixo `http://NOME.local` (padrão `controle`)          |
 | `--max-players N` | Quantidade inicial de controles (padrão 4, máx. 8; muda no painel) |
-| `--screen`   | Já começa com a transmissão da tela ligada (liga/desliga também no painel) |
 | `--screen-width N` / `--screen-fps N` / `--screen-quality N` / `--screen-monitor NOME` | Largura (1920), fps (60), qualidade JPEG 2–31 (6); o painel também ajusta e guarda em `~/.controle-web/screen.json` e monitor da transmissão |
 | `--dry-run`  | Não cria o controle virtual; só mostra as entradas no log   |
 | `--verbose`  | Loga também os movimentos do analógico                      |
@@ -171,7 +170,9 @@ deslizar o dedo de um botão de ação para outro sem levantar.
   "Corrida"). **+ Novo** copia o perfil atual. Tudo fica salvo no celular.
 - **Editar HUD:** arraste para mover, pinça com dois dedos (ou − / +) para o
   tamanho, **◐ − / +** para a transparência (sem nenhum botão selecionado
-  muda todos de uma vez), **Ocultar/Mostrar** botões (L3/R3 começam ocultos).
+  muda todos de uma vez), **Desativar/Ativar** botões (L3/R3 começam desativados) e **Invisível/Visível**:
+  o botão some da tela mas continua funcionando. Na edição, borda verde =
+  aparece na tela, vermelha (e transparente) = invisível, tracejada = desativado.
 - **Tela do PC no fundo:** mostra a tela do computador atrás do controle.
   Primeiro ligue **Tela do PC** no painel (vem desligada por segurança) e
   depois ative no menu do celular. No Linux/Wayland usa `gpu-screen-recorder`
