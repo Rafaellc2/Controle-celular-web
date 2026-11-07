@@ -39,6 +39,19 @@ html, body {
 
 .hidden { display: none !important; }
 
+/* ---------- Tela do PC ---------- */
+.screen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  pointer-events: none;
+  display: none;
+}
+.screen.live { display: block; }
+
 /* ---------- HUD ---------- */
 #pad {
   position: fixed;
@@ -53,6 +66,7 @@ html, body {
   left: calc(var(--x, 50) * 1%);
   top: calc(var(--y, 50) * 1%);
   transform: translate(-50%, -50%) scale(calc(var(--s) * var(--press)));
+  opacity: var(--o, 1);
 }
 .item.is-hidden { display: none; }
 
@@ -271,7 +285,7 @@ body.editing .item.selected {
 .edit-title { font-size: 3vmin; color: var(--muted); white-space: nowrap; }
 /* Enquanto arrasta um botão, a barra some para mostrar o que está embaixo */
 body.dragging .editbar { opacity: 0.12; pointer-events: none; }
-.edit-row { display: flex; gap: 1.2vmin; }
+.edit-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.2vmin; }
 .ebtn {
   min-width: 8vmin;
   height: 8vmin;

@@ -14,6 +14,7 @@
   const slotsEl = $("#slots");
   const template = $("#slot-template");
   const enabledEl = $("#enabled");
+  const screenEl = $("#screen");
   const maxEl = $("#max-players");
 
   let ws = null;
@@ -58,6 +59,13 @@
     $("#summary").textContent = `${online} de ${total} ${total === 1 ? "controle conectado" : "controles conectados"} · porta ${s.port}`;
 
     enabledEl.checked = s.enabled;
+    const sc = s.screen || {};
+    screenEl.checked = Boolean(sc.enabled);
+    screenEl.disabled = sc.available === false;
+    $("#screen-label").textContent = sc.available === false ? "Tela do PC indisponível (falta ffmpeg/gpu-screen-recorder)"
+      : !sc.enabled ? "Tela do PC desligada"
+      : sc.error ? `Tela do PC: ${sc.error}`
+      : `Tela do PC ligada · ${sc.viewers} assistindo`;
     $("#enabled-label").textContent = s.enabled ? "Acesso ligado" : "Acesso desligado";
     const note = $("#access-note");
     note.textContent = s.enabled
@@ -191,6 +199,8 @@
   }
 
   // ---------- Ações ----------
+  screenEl.addEventListener("change", () => command({ cmd: "screen", value: screenEl.checked }));
+
   enabledEl.addEventListener("change", () => command({ cmd: "enabled", value: enabledEl.checked }));
   document.querySelectorAll("#link-tabs .tab").forEach((tab) => {
     tab.addEventListener("click", () => {

@@ -11,6 +11,9 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Tela do PC (transmissão), atrás do HUD -->
+  <canvas id="screen" class="screen"></canvas>
+
   <!-- HUD: cada .item é posicionado pelo app.js (layout do perfil ativo, salvo no aparelho) -->
   <main id="pad">
     <div class="item btn shoulder" data-item="LT" data-btn="LT">L2</div>
@@ -57,6 +60,8 @@
     <div class="edit-row">
       <div class="ebtn" data-action="size-down">−</div>
       <div class="ebtn" data-action="size-up">+</div>
+      <div class="ebtn" data-action="opacity-down" title="Mais transparente">◐ −</div>
+      <div class="ebtn" data-action="opacity-up" title="Mais opaco">◐ +</div>
       <div class="ebtn" id="toggle-hide" data-action="toggle-hide">Ocultar</div>
       <div class="ebtn" data-action="bar-move" title="Mover esta barra">⇅</div>
       <div class="ebtn" data-action="reset">Padrão</div>
@@ -87,6 +92,11 @@
             <span class="tg" id="tg-floating"></span>
           </div>
           <div class="sheet-btn" data-action="fullscreen">⛶ Tela cheia</div>
+          <div class="toggle" data-action="screen">
+            <span>Tela do PC no fundo<small>transmite a tela do computador (liga no painel do PC)</small></span>
+            <span class="tg" id="tg-screen"></span>
+          </div>
+          <p id="screen-note" class="sheet-note"></p>
         </section>
 
         <section class="sheet-col">

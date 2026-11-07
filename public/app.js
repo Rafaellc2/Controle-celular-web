@@ -15,7 +15,7 @@
   // Cor de cada JOYSTICK-N (mesma ordem do painel)
   const SLOT_COLORS = ["#7fa8ff", "#ff6b6b", "#4fd1a5", "#e58cff", "#ffb547", "#5ad7e6", "#ff9a5a", "#b49cff"];
 
-  // Layout padrão do HUD: centro do item em % da tela (x, y), escala (s) e se começa oculto
+  // Layout padrão do HUD: centro do item em % da tela (x, y), escala (s), opacidade (o, 1 = opaco) e se começa oculto
   const DEFAULT_LAYOUT = {
     LT: { x: 10, y: 12, s: 1 },
     LB: { x: 27, y: 12, s: 1 },
@@ -41,6 +41,10 @@
   };
   const SCALE_MIN = 0.4;
   const SCALE_MAX = 2.2;
+  const OPACITY_MIN = 0.1;
+  const OPACITY_STEP = 0.1;
+  const SCREEN_KEY = "controle-tela-pc";
+  const SCREEN_RETRY = 1000;
   const PROFILES_KEY = "controle-perfis-v1";
   const OLD_LAYOUT_KEY = "controle-hud-v1"; // versão antiga: um layout só
 
@@ -126,6 +130,7 @@
       if (Number.isFinite(it.x)) layout[id].x = clamp(it.x, 0, 100);
       if (Number.isFinite(it.y)) layout[id].y = clamp(it.y, 0, 100);
       if (Number.isFinite(it.s)) layout[id].s = clamp(it.s, SCALE_MIN, SCALE_MAX);
+      if (Number.isFinite(it.o)) layout[id].o = clamp(it.o, OPACITY_MIN, 1);
       if ("hidden" in it) layout[id].hidden = Boolean(it.hidden);
     }
     return layout;
@@ -168,6 +173,7 @@
     el.style.setProperty("--x", it.x);
     el.style.setProperty("--y", it.y);
     el.style.setProperty("--s", it.s);
+    el.style.setProperty("--o", it.o ?? 1);
     el.classList.toggle("is-hidden", Boolean(it.hidden));
   }
 
@@ -299,6 +305,63 @@
     findTimer = setTimeout(() => findEl.classList.add("hidden"), 2600);
   }
 
+  // ---------- Tela do PC ----------
+  const screenEl = $("#screen");
+  const screenCtx = screenEl.getContext("2d", { alpha: false });
+  let screenWanted = load(SCREEN_KEY) === "1";
+  let screenAllowed = false;   // o PC está transmitindo e este celular pode ver
+  let screenWs = null;
+  let screenTimer = null;
+  let pendingFrame = null;
+  let decoding = false;
+
+  function syncScreen() {
+    clearTimeout(screenTimer);
+    const want = screenWanted && screenAllowed && isOpen();
+    if (!want) {
+      if (screenWs) { const s = screenWs; screenWs = null; s.close(); }
+      pendingFrame = null;
+      screenEl.classList.remove("live");
+      return;
+    }
+    if (screenWs) return;
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const sock = new WebSocket(`${proto}//${location.host}/screen?cid=${encodeURIComponent(CID)}`);
+    sock.binaryType = "arraybuffer";
+    screenWs = sock;
+    sock.onmessage = (ev) => {
+      pendingFrame = ev.data;
+      if (!decoding) drawFrames();
+    };
+    sock.onclose = () => {
+      if (screenWs !== sock) return;
+      screenWs = null;
+      screenEl.classList.remove("live");
+      screenTimer = setTimeout(syncScreen, SCREEN_RETRY);
+    };
+    sock.onerror = () => sock.close();
+  }
+
+  // Decodifica só o quadro mais novo: se o celular atrasar, os antigos são descartados.
+  async function drawFrames() {
+    decoding = true;
+    while (pendingFrame) {
+      const buf = pendingFrame;
+      pendingFrame = null;
+      try {
+        const bmp = await createImageBitmap(new Blob([buf], { type: "image/jpeg" }));
+        if (screenEl.width !== bmp.width || screenEl.height !== bmp.height) {
+          screenEl.width = bmp.width;
+          screenEl.height = bmp.height;
+        }
+        screenCtx.drawImage(bmp, 0, 0);
+        bmp.close();
+        screenEl.classList.add("live");
+      } catch { /* quadro corrompido: pula */ }
+    }
+    decoding = false;
+  }
+
   function connect() {
     clearTimeout(reconnectTimer);
     if (stopped || (ws && ws.readyState <= WebSocket.OPEN)) return;
@@ -328,6 +391,8 @@
         reconnectDelay = RECONNECT_MIN;
         playerName = data.name || "";
         httpsUrl = data.https || null;
+        screenAllowed = Boolean(data.screen);
+        syncScreen();
         setSlot(data.slot);
         hideNotice();
         setStatus("on", playerName || "Conectado");
@@ -339,6 +404,10 @@
         playerName = data.name || "";
       } else if (data.t === "rumble") {
         playRumble(Number(data.v) || 0, data.ms || null);
+      } else if (data.t === "screen") {
+        screenAllowed = Boolean(data.on);
+        syncScreen();
+        if (!menuEl.classList.contains("hidden")) renderMenu();
       } else if (data.t === "find") {
         showFind(data.slot || currentSlot || 1);
       }
@@ -348,6 +417,8 @@
       if (ws !== sock) return;
       clearInterval(pingTimer);
       ws = null;
+      screenAllowed = false;
+      syncScreen();
       playRumble(0);
       setSlot(null);
       setStatus("off", "Desconectado");
@@ -694,14 +765,23 @@
   function updateEditbar() {
     const it = selected && draft ? draft[selected] : null;
     $("#edit-title").textContent = it
-      ? `${ITEM_NAMES[selected]} · ${Math.round(it.s * 100)}%${it.hidden ? " · oculto" : ""}`
-      : `${profiles.active}: arraste para mover · pinça com 2 dedos para redimensionar`;
+      ? `${ITEM_NAMES[selected]} · tamanho ${Math.round(it.s * 100)}% · opacidade ${Math.round((it.o ?? 1) * 100)}%${it.hidden ? " · oculto" : ""}`
+      : `${profiles.active}: arraste para mover · pinça redimensiona · ◐ muda a opacidade de todos`;
     $("#toggle-hide").textContent = it && it.hidden ? "Mostrar" : "Ocultar";
   }
 
   function setScale(id, s) {
     draft[id].s = Math.round(clamp(s, SCALE_MIN, SCALE_MAX) * 100) / 100;
     applyItem(id, draft[id]);
+    updateEditbar();
+  }
+
+  // Sem item selecionado, muda a opacidade de todos de uma vez.
+  function changeOpacity(delta) {
+    for (const id of selected ? [selected] : Object.keys(draft)) {
+      draft[id].o = Math.round(clamp((draft[id].o ?? 1) + delta, OPACITY_MIN, 1) * 100) / 100;
+      applyItem(id, draft[id]);
+    }
     updateEditbar();
   }
 
@@ -795,6 +875,9 @@
 
     $("#tg-floating").classList.toggle("on", p.floating);
     $("#tg-game-vibra").classList.toggle("on", gameVibra);
+    $("#tg-screen").classList.toggle("on", screenWanted);
+    $("#screen-note").textContent = screenWanted && !screenAllowed
+      ? "A transmissão está desligada no painel do PC (ou o PC não consegue capturar a tela)." : "";
     $("#tg-gyro-invert").classList.toggle("on", p.gyroInvert);
 
     document.querySelectorAll("#vibra .seg").forEach((el) => {
@@ -978,6 +1061,8 @@
       case "size-up":
         if (selected) setScale(selected, draft[selected].s + 0.1);
         break;
+      case "opacity-down": changeOpacity(-OPACITY_STEP); break;
+      case "opacity-up": changeOpacity(OPACITY_STEP); break;
       case "toggle-hide":
         if (selected) {
           draft[selected].hidden = !draft[selected].hidden;
@@ -1004,6 +1089,13 @@
         gameVibra = !gameVibra;
         save(GAME_VIBRA_KEY, gameVibra ? "1" : "0");
         if (!gameVibra) playRumble(0);
+        renderMenu();
+        break;
+
+      case "screen":
+        screenWanted = !screenWanted;
+        save(SCREEN_KEY, screenWanted ? "1" : "0");
+        syncScreen();
         renderMenu();
         break;
 

@@ -29,6 +29,7 @@ from urllib.parse import urlparse
 from aiohttp import WSMsgType, web
 
 from hub import Hub
+from screen import Screen
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_DIR = ROOT / "public"
@@ -40,6 +41,7 @@ PORT = web.AppKey("port", int)
 TASKS = web.AppKey("tasks", list)
 STOP = web.AppKey("stop", asyncio.Event)
 NET = web.AppKey("net", dict)  # nome mDNS, porta HTTPS, zeroconf
+SCREEN = web.AppKey("screen", Screen)
 
 CERT_DIR = Path.home() / ".controle-web"
 
@@ -156,7 +158,9 @@ async def ws_player(request):
     if old is not None and not old.closed:
         await old.close(code=4000, message=b"replaced")
     links = hub.extra_state.get("links", {})
-    await ws.send_json({"t": "hello", "slot": player.slot, "name": player.name, "https": links.get("https")})
+    screen = request.app[SCREEN]
+    await ws.send_json({"t": "hello", "slot": player.slot, "name": player.name, "https": links.get("https"),
+                        "screen": screen.enabled and screen.available})
     hub.changed()
 
     try:
@@ -180,6 +184,32 @@ async def ws_player(request):
     finally:
         hub.leave(player, ws)
 
+    return ws
+
+
+async def ws_screen(request):
+    """Quadros JPEG da tela do PC, só para celulares já conectados como jogador."""
+    hub, screen = request.app[HUB], request.app[SCREEN]
+    cid = request.query.get("cid", "")
+    if not (screen.enabled and screen.available) or not any(p.cid == cid and p.online for p in hub.players.values()):
+        raise web.HTTPForbidden()
+    ws = web.WebSocketResponse(heartbeat=10, max_msg_size=1024)
+    await ws.prepare(request)
+    viewer = screen.add()
+
+    async def pump():
+        while True:
+            await viewer.event.wait()
+            viewer.event.clear()
+            await ws.send_bytes(viewer.frame)  # espera a rede: quadros que chegam enquanto isso são descartados
+
+    sender = asyncio.create_task(pump())
+    try:
+        async for _ in ws:
+            pass
+    finally:
+        sender.cancel()
+        screen.remove(viewer)
     return ws
 
 
@@ -220,12 +250,31 @@ async def run_admin_command(app, cmd):
         await hub.rename(int(cmd["slot"]), cmd["name"])
     elif action == "find":
         await hub.find(int(cmd["slot"]))
+    elif action == "screen":
+        await set_screen_enabled(app, bool(cmd["value"]))
     elif action == "retry_backend":
         hub.retry_backend()
     elif action == "shutdown":
         log.info("Encerrando pelo painel.")
         # Deixa a resposta sair antes de desligar.
         asyncio.get_running_loop().call_later(0.2, app[STOP].set)
+
+
+async def set_screen_enabled(app, enabled):
+    hub, screen = app[HUB], app[SCREEN]
+    screen.enabled = enabled
+    log.info("Transmissão da tela %s", "LIGADA" if enabled else "DESLIGADA")
+    if not enabled:
+        await screen.stop()
+    for p in hub.players.values():
+        await hub._send(p, {"t": "screen", "on": enabled and screen.available})
+    sync_screen_state(app)
+
+
+def sync_screen_state(app):
+    hub = app[HUB]
+    hub.extra_state["screen"] = app[SCREEN].info()
+    hub.changed()
 
 
 # ---------- HTTPS (certificado próprio) ----------
@@ -368,6 +417,7 @@ async def on_startup(app):
     hub = app[HUB]
     await start_mdns(app)
     refresh_extra(app)
+    sync_screen_state(app)
     hub.pad(1)  # cria o JOYSTICK-1 já na abertura e detecta problema de driver/permissão
     app[TASKS].append(asyncio.create_task(hub.admin_loop()))
     app[TASKS].append(asyncio.create_task(hub.housekeeping_loop(lambda: asyncio.create_task(housekeeping_extra(app)))))
@@ -382,6 +432,7 @@ async def on_shutdown(app):
             await p.ws.close(code=1001, message=b"shutdown")
     for t in app[TASKS]:
         t.cancel()
+    await app[SCREEN].stop()
     await stop_mdns(app)
 
 
@@ -415,6 +466,11 @@ def main():
                         help="nome na rede: http://NOME.local")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--max-players", type=int, default=4)
+    parser.add_argument("--screen", action="store_true", help="já começa com a transmissão da tela do PC ligada")
+    parser.add_argument("--screen-width", type=int, default=960, help="largura da imagem enviada ao celular")
+    parser.add_argument("--screen-fps", type=int, default=30, help="quadros por segundo da transmissão")
+    parser.add_argument("--screen-quality", type=int, default=5, help="qualidade JPEG: 2 (melhor) a 31 (pior)")
+    parser.add_argument("--screen-monitor", default=None, help="monitor a transmitir (ex.: eDP-1); padrão: o primeiro")
     parser.add_argument("--dry-run", action="store_true", help="não cria controles virtuais, só loga")
     parser.add_argument("--verbose", action="store_true", help="loga também o movimento dos analógicos")
     args = parser.parse_args()
@@ -434,6 +490,9 @@ def main():
     app = web.Application()
     app[HUB] = Hub(dry_run=args.dry_run, max_players=args.max_players)
     app[PORT] = args.port
+    app[SCREEN] = Screen(width=args.screen_width, fps=args.screen_fps, quality=args.screen_quality,
+                         monitor=args.screen_monitor, on_change=lambda: sync_screen_state(app))
+    app[SCREEN].enabled = args.screen
     app[TASKS] = []
     app[STOP] = asyncio.Event()
     app[NET] = {"name": args.name, "https_port": args.https_port if ssl_ctx else None}
@@ -443,6 +502,7 @@ def main():
 
     app.router.add_get("/", index)
     app.router.add_get("/ws", ws_player)
+    app.router.add_get("/screen", ws_screen)
     app.router.add_get("/api/ping", ping)
     app.router.add_get("/admin", admin_page)
     app.router.add_get("/admin/ws", ws_admin)

@@ -17,6 +17,7 @@ Celular (navegador)  --WebSocket/Wi-Fi-->  server.py  --vgamepad-->  ViGEmBus  -
 controle-web     # lançador: sobe o servidor (se preciso) e abre o painel
 server/
   server.py      # HTTP + WebSockets (/ws celulares, /admin/ws painel), IP e QR Code
+  screen.py      # transmissão da tela do PC (MJPEG) para o fundo do controle
   hub.py         # slots JOYSTICK-N, reservas, comandos do painel
   gamepad.py     # controle virtual por slot (ViGEmBus, uinput ou só log em --dry-run)
 admin/           # painel (só abre em http://localhost neste PC)
@@ -68,6 +69,8 @@ Opções:
 | `--https-port N` | Porta HTTPS para o giroscópio (padrão `8443`; `0` desliga) |
 | `--name NOME` | Link fixo `http://NOME.local` (padrão `controle`)          |
 | `--max-players N` | Quantidade inicial de controles (padrão 4, máx. 8; muda no painel) |
+| `--screen`   | Já começa com a transmissão da tela ligada (liga/desliga também no painel) |
+| `--screen-width N` / `--screen-fps N` / `--screen-quality N` / `--screen-monitor NOME` | Largura (960), fps (30), qualidade JPEG 2–31 (5) e monitor da transmissão |
 | `--dry-run`  | Não cria o controle virtual; só mostra as entradas no log   |
 | `--verbose`  | Loga também os movimentos do analógico                      |
 
@@ -167,7 +170,13 @@ deslizar o dedo de um botão de ação para outro sem levantar.
 - **Perfis do HUD:** um layout e ajustes por jogo (ex.: "Bomba Patch",
   "Corrida"). **+ Novo** copia o perfil atual. Tudo fica salvo no celular.
 - **Editar HUD:** arraste para mover, pinça com dois dedos (ou − / +) para o
-  tamanho, **Ocultar/Mostrar** botões (L3/R3 começam ocultos).
+  tamanho, **◐ − / +** para a transparência (sem nenhum botão selecionado
+  muda todos de uma vez), **Ocultar/Mostrar** botões (L3/R3 começam ocultos).
+- **Tela do PC no fundo:** mostra a tela do computador atrás do controle.
+  Primeiro ligue **Tela do PC** no painel (vem desligada por segurança) e
+  depois ative no menu do celular. No Linux/Wayland usa `gpu-screen-recorder`
+  + `ffmpeg` (precisam estar instalados); no Windows usa só o `ffmpeg`.
+  Jogos em tela cheia exclusiva podem aparecer pretos: use janela sem borda.
 - **Analógico flutuante:** o analógico esquerdo aparece onde o dedo encostar
   no lado esquerdo da tela.
 - **Vibração ao apertar:** desligada, fraca, média ou forte, com botão de teste.
